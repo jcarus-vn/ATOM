@@ -16,10 +16,8 @@
 </p>
 
 
-> **ATOM - Atomic Thought Organizing Machine.** A standalone project based on
-> [virgiliojr94/book-to-skill](https://github.com/virgiliojr94/book-to-skill)
-> (MIT; original author credited in LICENSE). It keeps the original
-> converter and adds the master-skill system: flexible chapter detection,
+> **ATOM - Atomic Thought Organizing Machine.** It converts books and
+> documents and adds the master-skill system: flexible chapter detection,
 > OCR for scanned PDFs and figures, web URL inputs, and field master skills
 > built from atomic notes, taxonomy, typed graph, facets, and a registry
 > (docs/master-skill.md). Built for projects, not casual readers: it is
