@@ -381,27 +381,358 @@ def build_graph(notes: list[dict], taxonomy_nodes: list[dict]) -> dict:
 
 
 def query_notes(notes: list[dict], filters: dict | None = None,
-                term: str | None = None, status: str | None = None) -> list[dict]:
-    """Filter notes by facet (topic/technique/level/source_type), term, status."""
+                term: str | None = None, status: str | None = None,
+                source: str | None = None) -> list[dict]:
+    """Filter notes by facet (topic/technique/level/source_type), term,
+    status, and source. The source filter is a case-insensitive
+    substring match over a note's source citations (and source keys
+    when present), so it composes with every other filter: bounding a
+    query to one book never silently re-admits another book's notes.
+    """
     filters = filters or {}
+    wanted = (source or "").strip().lower()
     out = []
     for note in notes:
         if status and note["status"] != status:
             continue
         if term and normalize_title(term) not in normalize_title(note["title"]):
             continue
+        if wanted and not _matches_source(note, wanted):
+            continue
         ok = True
         for key, value in filters.items():
             facet_value = (note["facets"].get(key) or "").lower()
-            wanted = str(value).lower()
-            if key == "technique" and wanted == normalize_title(note["title"]):
+            wanted_value = str(value).lower()
+            if key == "technique" and wanted_value == normalize_title(note["title"]):
                 continue  # a pattern is its own technique
-            if facet_value != wanted:
+            if facet_value != wanted_value:
                 ok = False
                 break
         if ok:
             out.append(note)
     return out
+
+
+def _matches_source(note: dict, wanted_lower: str) -> bool:
+    """True when *wanted_lower* names one of the note's sources."""
+    for key in note.get("source_keys", []):
+        if wanted_lower in str(key).lower():
+            return True
+    for citation in note.get("sources", []):
+        if wanted_lower in str(citation).lower():
+            return True
+    return False
+
+
+def bound_view(note: dict, source: str) -> dict:
+    """The bound view of one note for a source filter.
+
+    Architecture: the bound is a filtered VIEW inside the master,
+    never a detour to the per-book extract skill. The master stays the
+    answering layer (merged notes, consensus/contested status,
+    taxonomy, graph); the bound only scopes which of the master's own
+    notes and definitions are shown. The per-book skill remains input
+    material only and is never loaded by any bound query path.
+
+    A merged multi-source note never silently mixes books: for a
+    contested note only the bullet definitions whose citation matches
+    the bound are shown; for any note the matching and hidden sources
+    are listed separately. Returns ``body``, ``matching_sources`` and
+    ``hidden_sources``.
+    """
+    wanted = (source or "").strip().lower()
+    matching = [s for s in note.get("sources", [])
+                if wanted in str(s).lower()]
+    hidden = [s for s in note.get("sources", [])
+              if wanted not in str(s).lower()]
+    body = note.get("body", "")
+    if note.get("status") == "contested" and wanted:
+        bullets = [line for line in body.splitlines()
+                   if line.strip().startswith("- ")]
+        kept = [line for line in bullets if wanted in line.lower()]
+        if bullets and kept:
+            body = "\n".join(kept)
+    return {"body": body, "matching_sources": matching,
+            "hidden_sources": hidden}
+
+# ---------------------------------------------------------------------------
+# Ranked retrieval: the shared question-answering path.
+# ---------------------------------------------------------------------------
+# Used by both the product query (scripts/build_master.py --question)
+# and the answer-quality eval (tools/eval_answer_quality.py), so a
+# measured improvement is a product improvement, not an eval artifact.
+#
+# Scoring, in order of mechanism (all weights fixed here, none tuned
+# per question):
+# - term overlap: 3 per title-term hit, 2 per taxonomy-label hit,
+#   1 per body-term hit (the pre-existing weights, preserved);
+# - title coverage: at most +1 for a note whose whole title is named
+#   by the question. Bounded on purpose: full coverage rescoring
+#   (replacing hit counts with coverage) was prototyped and made
+#   old-set recall worse (0.77 -> 0.51), because long pattern titles
+#   that restate the question then outranked every definition;
+# - facet topic: 2 per matching term from the note's own declared
+#   topic facet, the same routing idea as taxonomy labels;
+# - concept identity: +6 when the question names the note's concept
+#   exactly (full title, or a parenthesized acronym in the title such
+#   as "(SLAM)"). Canonical definition notes used to lose to
+#   keyword-dense pattern notes that merely mention the concept;
+# - definitional glossary bonus: +3 for glossary notes when the
+#   question asks what something is ("what", "define", "mean").
+#   Definitions should answer definition questions;
+# - expansion: +4 for a note that shares a source chapter, or a typed
+#   concept-graph edge, with a top-3 seed, provided it already has a
+#   positive base score. The bonus is fixed, not proportional to the
+#   seed: a proportional bonus (0.5 x seed) was prototyped and flooded
+#   the top-k with mediocre same-chapter notes. Area ("part_of")
+#   edges are excluded: area nodes are chapter buckets, not concepts,
+#   and expanding through them would promote whole chapters at once.
+# A note's chapter keys are the base URLs of its source citations.
+
+_RANK_STOPWORDS = {
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "what", "which", "who", "whom", "when", "where", "why", "how",
+    "do", "does", "did", "can", "could", "should", "would", "will",
+    "of", "in", "on", "at", "to", "for", "from", "with", "without",
+    "by", "and", "or", "but", "not", "no", "than", "then", "into",
+    "its", "it", "as", "that", "this", "these", "those", "there",
+    "between", "under", "over", "each", "other", "both", "per",
+}
+
+CONCEPT_BOOST = 6.0
+GLOSSARY_BONUS = 3.0
+EXPANSION_BONUS = 4.0
+EXPANSION_SEEDS = 3
+
+
+def _rank_terms(text: str) -> list[str]:
+    """Content terms of *text*: normalized tokens minus stopwords."""
+    return [t for t in re.findall(r"[a-z0-9]+", normalize_title(text or ""))
+            if t not in _RANK_STOPWORDS and len(t) >= 2]
+
+
+def _chapter_keys(note: dict) -> set[str]:
+    """Base URLs of a note's source citations (one key per chapter)."""
+    keys = set()
+    for citation in note.get("sources", []):
+        for url in re.findall(r"https?://\S+", citation or ""):
+            keys.add(url.rstrip("/").split("(")[0])
+    return keys
+
+
+def _concept_adjacency(notes: list[dict],
+                       graph_edges: list[dict]) -> dict[str, list[str]]:
+    """Concept-to-concept adjacency from graph edges and note links.
+
+    Area nodes (ids starting with "area-") are scaffolding, not
+    concepts, so edges touching them are ignored here.
+    """
+    adjacency: dict[str, list[str]] = {}
+    pairs = [(e.get("from", ""), e.get("to", ""))
+             for e in (graph_edges or [])]
+    for note in notes:
+        for link in note.get("links", []):
+            pairs.append((note.get("id", ""), link.get("to", "")))
+    for source, target in pairs:
+        if not source or not target:
+            continue
+        if source.startswith("area-") or target.startswith("area-"):
+            continue
+        adjacency.setdefault(source, []).append(target)
+        adjacency.setdefault(target, []).append(source)
+    return adjacency
+
+
+def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
+               graph_edges: list[dict], question: str,
+               k: int | None = None, source: str | None = None,
+               params: dict | None = None) -> list[dict]:
+    """Rank notes for a natural-language *question*.
+
+    Returns the full ranking by default (callers slice to top-k);
+    pass ``k`` to truncate here. With ``source`` set, the candidate
+    pool is restricted to notes from that source BEFORE ranking, so
+    seeds, chapter/graph expansion, and every returned note stay
+    inside the bound: a bound answer can never smuggle in another
+    book's notes through expansion. Each entry carries ``note``,
+    ``score`` (final score, expansion included), ``title_hits``,
+    ``tax_hits``, ``body_hits``, ``concept_boost`` and
+    ``expansion_bonus``. Ties break by note id so rankings are
+    reproducible.
+
+    ``params`` overrides individual ranker knobs without changing the
+    shipped defaults: ``concept_boost`` (default 6.0),
+    ``glossary_bonus`` (3.0), ``expansion_bonus`` (4.0),
+    ``expansion_seeds`` (3), ``title_norm`` (True, whether the
+    title-coverage term counts). Unknown keys are ignored, so a
+    variant grid can pass partial overrides.
+    """
+    if source and str(source).strip():
+        wanted = str(source).strip().lower()
+        notes = [n for n in notes if _matches_source(n, wanted)]
+    cfg = {
+        "concept_boost": CONCEPT_BOOST,
+        "glossary_bonus": GLOSSARY_BONUS,
+        "expansion_bonus": EXPANSION_BONUS,
+        "expansion_seeds": EXPANSION_SEEDS,
+        "title_norm": True,
+    }
+    if params:
+        for key in cfg:
+            if key in params:
+                cfg[key] = params[key]
+    qterms = set(_rank_terms(question))
+    qnorm = normalize_title(question)
+    qraw = set(re.findall(r"[a-z0-9]+", qnorm))
+    node_labels: dict[str, set[str]] = {}
+    for node in taxonomy_nodes or []:
+        label_terms = set(_rank_terms(node.get("label", "")))
+        for url in node.get("sources", []):
+            for found in re.findall(r"https?://\S+", url):
+                node_labels.setdefault(found, set()).update(label_terms)
+    definitional = bool(qraw & {"what", "define", "definition", "mean", "means"})
+    base: dict[str, dict] = {}
+    for note in notes:
+        title_terms = set(_rank_terms(note.get("title", "")))
+        body_terms = set(_rank_terms(note.get("body", "")))
+        title_hits = len(qterms & title_terms)
+        coverage = title_hits / len(title_terms) if title_terms else 0.0
+        tax_terms: set[str] = set()
+        for citation in note.get("sources", []):
+            for url in re.findall(r"https?://\S+", citation):
+                tax_terms.update(node_labels.get(url, set()))
+        tax_hits = len(qterms & tax_terms)
+        body_hits = len(qterms & body_terms)
+        topic_terms = set(_rank_terms((note.get("facets") or {}).get("topic", "")))
+        topic_hits = len(qterms & topic_terms)
+        title_norm = normalize_title(note.get("title", ""))
+        concept = 0.0
+        if title_norm and title_norm in qnorm:
+            concept = 1.0
+        else:
+            match = re.search(r"\(([^)]+)\)", note.get("title", ""))
+            if match and normalize_title(match.group(1)) in qnorm:
+                concept = 1.0
+        glossary = 1.0 if (definitional
+                            and note.get("kind") == "glossary") else 0.0
+        score = (3 * title_hits
+                 + (coverage if cfg["title_norm"] else 0.0)
+                 + 2 * tax_hits + body_hits
+                 + 2 * topic_hits + cfg["concept_boost"] * concept
+                 + cfg["glossary_bonus"] * glossary)
+        base[note.get("id", "")] = {
+            "note": note, "score": score, "title_hits": title_hits,
+            "tax_hits": tax_hits, "body_hits": body_hits,
+            "concept_boost": concept, "expansion_bonus": 0.0,
+        }
+    order = sorted(base.values(),
+                   key=lambda r: (-r["score"], r["note"].get("id", "")))
+    seeds = order[:cfg["expansion_seeds"]]
+    seed_chapters: set[str] = set()
+    for seed in seeds:
+        seed_chapters.update(_chapter_keys(seed["note"]))
+    adjacency = _concept_adjacency(notes, graph_edges)
+    seed_ids = {s["note"].get("id", "") for s in seeds}
+    final: dict[str, float] = {}
+    for note_id, entry in base.items():
+        bonus = 0.0
+        if note_id not in seed_ids and entry["score"] > 0:
+            if _chapter_keys(entry["note"]) & seed_chapters:
+                bonus = cfg["expansion_bonus"]
+            elif any(nb in seed_ids for nb in adjacency.get(note_id, [])):
+                bonus = cfg["expansion_bonus"]
+        entry["expansion_bonus"] = bonus
+        final[note_id] = entry["score"] + bonus
+    ranked = sorted(base.values(),
+                    key=lambda r: (-final[r["note"].get("id", "")],
+                                   r["note"].get("id", "")))
+    for entry in ranked:
+        entry["score"] = final[entry["note"].get("id", "")]
+    if k is not None and k > 0:
+        return ranked[:k]
+    return ranked
+
+
+def suggest_related(notes: list[dict], graph_edges: list[dict],
+                    retrieved_ids: list[str], limit: int = 5,
+                    source: str | None = None) -> list[dict]:
+    """Suggest 3-5 related keywords for an answer, from the master only.
+
+    Suggestions are real notes, never invented: graph neighbors of the
+    retrieved notes (1 hop, then 2 hops via typed concept edges) first,
+    then notes sharing a source chapter with a retrieved note
+    (taxonomy siblings). Retrieved notes themselves are excluded, and
+    suggestions are presented separately from the answer so the answer
+    stays concise. With ``source`` set, the suggestion pool is
+    restricted to that source's notes, so bound mode cannot leak
+    another book's keywords into the suggestion list. Returns dicts
+    with ``id``, ``title`` and ``reason``.
+    """
+    if source and str(source).strip():
+        wanted = str(source).strip().lower()
+        notes = [n for n in notes if _matches_source(n, wanted)]
+    by_id = {n.get("id", ""): n for n in notes}
+    retrieved = [i for i in retrieved_ids if i in by_id]
+    retrieved_set = set(retrieved)
+    adjacency = _concept_adjacency(notes, graph_edges)
+    chapters: dict[str, set[str]] = {}
+    for note in notes:
+        for key in _chapter_keys(note):
+            chapters.setdefault(key, set()).add(note.get("id", ""))
+    one_hop: dict[str, list[str]] = {}
+    for rid in retrieved:
+        for nb in adjacency.get(rid, []):
+            if nb in by_id and nb not in retrieved_set:
+                one_hop.setdefault(nb, []).append(rid)
+    two_hop: dict[str, list[str]] = {}
+    for rid in retrieved:
+        for mid in adjacency.get(rid, []):
+            for nb in adjacency.get(mid, []):
+                if nb in by_id and nb not in retrieved_set \
+                        and nb not in one_hop:
+                    two_hop.setdefault(nb, []).append(mid)
+    siblings: dict[str, list[str]] = {}
+    for rid in retrieved:
+        for key in _chapter_keys(by_id[rid]):
+            for nid in chapters.get(key, set()):
+                if nid not in retrieved_set and nid not in one_hop \
+                        and nid not in two_hop:
+                    siblings.setdefault(nid, []).append(rid)
+    tiers = [
+        (one_hop, lambda nid, srcs: (
+            f"graph: { _edge_type(graph_edges, notes, srcs[0], nid) }"
+            f" of '{by_id[srcs[0]]['title']}'")),
+        (two_hop, lambda nid, srcs: (
+            f"graph: 2 hops via '{by_id[srcs[0]]['title']}'")),
+        (siblings, lambda nid, srcs: (
+            f"same chapter as '{by_id[srcs[0]]['title']}'")),
+    ]
+    out: list[dict] = []
+    for tier, reason_fn in tiers:
+        ordered = sorted(tier.items(),
+                         key=lambda kv: (-len(kv[1]), kv[0]))
+        for nid, srcs in ordered:
+            if len(out) >= limit:
+                break
+            out.append({"id": nid, "title": by_id[nid].get("title", ""),
+                        "reason": reason_fn(nid, srcs)})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _edge_type(graph_edges: list[dict], notes: list[dict],
+               source: str, target: str) -> str:
+    """Typed edge label between two notes, from graph edges or note links."""
+    for edge in graph_edges or []:
+        if {edge.get("from", ""), edge.get("to", "")} == {source, target}:
+            return edge.get("type", "linked")
+    by_id = {n.get("id", ""): n for n in notes}
+    for link in (by_id.get(source) or {}).get("links", []):
+        if link.get("to") == target:
+            return link.get("type", "linked")
+    return "linked"
+
 
 # ---------------------------------------------------------------------------
 # Rendering: notes are the data, everything else is a view of them.
@@ -821,14 +1152,16 @@ def list_masters(masters_root: Path) -> list[dict]:
 
 def query_across_masters(masters_root: Path, status: str | None = None,
                          term: str | None = None,
-                         filters: dict | None = None) -> list[dict]:
+                         filters: dict | None = None,
+                         source: str | None = None) -> list[dict]:
     """Query concepts across all masters without hand-grepping files."""
     results = []
     for entry in list_masters(masters_root):
         master = load_master(Path(masters_root) / entry.get("path", ""))
         if not master:
             continue
-        for note in query_notes(master.get("notes", []), filters, term, status):
+        for note in query_notes(master.get("notes", []), filters, term,
+                                status, source):
             results.append({"field": entry.get("field", ""),
                             "slug": entry.get("slug", ""),
                             "concept": note["title"], "status": note["status"],

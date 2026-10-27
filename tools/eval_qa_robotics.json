@@ -1,0 +1,216 @@
+[
+  {
+    "gold_facts": [
+      "joint estimation of robot state and map",
+      "unknown or partially known environments",
+      "noisy sensor data",
+      "front-end extracts constraints between states and map elements",
+      "back-end solves the estimation problem",
+      "filtering or smoothing over the trajectory"
+    ],
+    "gold_notes": [
+      "simultaneous-localization-and-mapping-slam",
+      "slam-front-end",
+      "slam-back-end"
+    ],
+    "id": "slam-definition",
+    "question": "What is SLAM, and how is it split into front-end and back-end?",
+    "source_chapter": "Simultaneous Localization and Mapping (SLAM)"
+  },
+  {
+    "gold_facts": [
+      "revisits a previously seen place",
+      "measurement linking two non-consecutive poses",
+      "correcting accumulated drift",
+      "loop closures are front-end constraints"
+    ],
+    "gold_notes": [
+      "loop-closure",
+      "slam-front-end",
+      "slam-back-end"
+    ],
+    "id": "slam-drift-loop-closure",
+    "question": "How does SLAM correct accumulated drift when a robot revisits a place?",
+    "source_chapter": "Simultaneous Localization and Mapping (SLAM)"
+  },
+  {
+    "gold_facts": [
+      "single augmented state with joint Gaussian belief",
+      "dense covariance costs O(N squared)",
+      "prohibitive at large scale",
+      "poses and map variables are nodes",
+      "each measurement contributes a factor",
+      "sparse nonlinear least-squares problem"
+    ],
+    "gold_notes": [
+      "ekf-slam",
+      "factor-graph-slam",
+      "pose-graph-slam"
+    ],
+    "id": "ekf-vs-factorgraph-slam",
+    "question": "How does EKF-SLAM differ from factor-graph SLAM in scaling and formulation?",
+    "source_chapter": "Simultaneous Localization and Mapping (SLAM)"
+  },
+  {
+    "gold_facts": [
+      "collision-free path from initial to goal placement",
+      "respects geometric and kinematic constraints",
+      "global perspective on environmental constraints",
+      "space of all possible configurations",
+      "connectivity of the free part of configuration space"
+    ],
+    "gold_notes": [
+      "motion-planning",
+      "configuration-space"
+    ],
+    "id": "motion-planning-definition",
+    "question": "What is motion planning, and what space does it reason in?",
+    "source_chapter": "Motion Planning"
+  },
+  {
+    "gold_facts": [
+      "random sampling and collision detection",
+      "high-dimensional problems where explicit representations become intractable",
+      "grows a tree toward unexplored regions",
+      "roadmap of sampled collision-free configurations",
+      "connected by feasible local paths"
+    ],
+    "gold_notes": [
+      "sampling-based-planning",
+      "rapidly-exploring-random-tree-rrt",
+      "probabilistic-roadmap-prm"
+    ],
+    "id": "rrt-vs-prm",
+    "question": "How do RRT and PRM differ as sampling-based motion planners?",
+    "source_chapter": "Motion Planning"
+  },
+  {
+    "gold_facts": [
+      "establish global feasibility",
+      "collision-free path",
+      "trajectory optimization refines the path",
+      "smooth dynamically consistent trajectory",
+      "dynamics, actuator limits"
+    ],
+    "gold_notes": [
+      "plan-then-refine",
+      "motion-planning",
+      "trajectory-optimization"
+    ],
+    "id": "plan-then-refine",
+    "question": "How do motion planning and trajectory optimization work together?",
+    "source_chapter": "Open-Loop Control and Trajectory Optimization"
+  },
+  {
+    "gold_facts": [
+      "See transforms raw sensor signals into semantic representations",
+      "Think turns representation into global state estimates",
+      "actionable intent",
+      "Act executes decisions through planning and control",
+      "act without direct external guidance"
+    ],
+    "gold_notes": [
+      "see-think-act-cycle",
+      "robot-autonomy"
+    ],
+    "id": "see-think-act",
+    "question": "What are the See-Think-Act stages of robot autonomy?",
+    "source_chapter": "Prospects"
+  },
+  {
+    "gold_facts": [
+      "belief distribution over state",
+      "prediction from the motion model",
+      "correction from the measurement model",
+      "canonical parametric filter for linear Gaussian systems",
+      "linearizes nonlinear models around the current estimate",
+      "propagates deterministically chosen sigma points"
+    ],
+    "gold_notes": [
+      "bayes-filter",
+      "kalman-filter",
+      "predict-correct-recursion",
+      "extended-kalman-filter-ekf",
+      "unscented-kalman-filter-ukf"
+    ],
+    "id": "bayes-vs-kalman",
+    "question": "How does the Bayes filter relate to the Kalman filter, and how do EKF and UKF extend it?",
+    "source_chapter": "Introduction to Localization and Filtering"
+  },
+  {
+    "gold_facts": [
+      "belief belongs to a parametric family, most commonly Gaussian",
+      "fixed set of parameters such as mean and covariance",
+      "trades representational flexibility for computational efficiency",
+      "approximates belief through discretization or sampling",
+      "weighted samples (particles)",
+      "multimodal beliefs at higher computational cost"
+    ],
+    "gold_notes": [
+      "parametric-filter",
+      "non-parametric-filter",
+      "kalman-filter",
+      "particle-filter"
+    ],
+    "id": "parametric-vs-nonparametric",
+    "question": "What is the trade-off between parametric and non-parametric state estimation filters?",
+    "source_chapter": "Approximate Filters for State Estimation"
+  },
+  {
+    "gold_facts": [
+      "guided only by cumulative numerical reward",
+      "without prior knowledge of system dynamics",
+      "limited set of expert demonstrations",
+      "reward design impractical or unsafe",
+      "free environmental interaction impractical or unsafe",
+      "dynamic programming blocked by unknown dynamics"
+    ],
+    "gold_notes": [
+      "reinforcement-learning",
+      "imitation-learning",
+      "learn-from-interaction-when-dynamics-are-unknown",
+      "demonstrate-when-rewards-are-hard-to-specify"
+    ],
+    "id": "rl-vs-imitation",
+    "question": "When should a robot learn from interaction (reinforcement learning) versus from expert demonstration (imitation)?",
+    "source_chapter": "Reinforcement Learning"
+  },
+  {
+    "gold_facts": [
+      "stochastic sequential decision-making formulation",
+      "uncertainty in the environment",
+      "action outcomes not fully predictable",
+      "decomposing long-horizon problems into nested simpler subproblems",
+      "theoretical foundation for reinforcement learning",
+      "does not require a model of system dynamics",
+      "learns from partial episodes by bootstrapping value estimates"
+    ],
+    "gold_notes": [
+      "markov-decision-process-mdp",
+      "dynamic-programming",
+      "model-free-learning",
+      "temporal-difference-learning"
+    ],
+    "id": "mdp-dynamic-programming",
+    "question": "What role do MDPs and dynamic programming play in sequential decision making and reinforcement learning?",
+    "source_chapter": "Reinforcement Learning"
+  },
+  {
+    "gold_facts": [
+      "open-loop control sequence depends only on time",
+      "not on the current system state",
+      "vulnerable to disturbances and modeling errors",
+      "closed-loop law u(t) = pi(x(t), t) depends on current state",
+      "feedback to correct deviations",
+      "state-dependent feedback so execution corrects itself"
+    ],
+    "gold_notes": [
+      "control-law",
+      "close-the-loop-against-uncertainty",
+      "feedback-controller"
+    ],
+    "id": "control-law-contested",
+    "question": "What is a control law, and why do open-loop and closed-loop definitions disagree?",
+    "source_chapter": "Open-Loop Control and Trajectory Optimization"
+  }
+]

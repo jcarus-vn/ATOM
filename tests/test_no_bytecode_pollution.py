@@ -52,6 +52,8 @@ ENTRY_POINTS = {
         "usage: discovery_tax.py [-h] --full-text FULL_TEXT [--skill-dir SKILL_DIR]"
     ),
     "tools/eval_taxonomy_lookup.py": "usage: eval_taxonomy_lookup.py [-h]",
+    "tools/eval_answer_quality.py": "usage: eval_answer_quality.py [-h]",
+    "tools/build_compact.py": "usage: build_compact.py [-h] legacy_dir out_dir",
     "atom/cli.py": "atom · turns a document into a structured agent skill",
 }
 
