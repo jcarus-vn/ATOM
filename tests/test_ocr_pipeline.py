@@ -32,6 +32,13 @@ def _needs_ocr():
         pytest.skip("DejaVu font not available")
 
 
+def _needs_pil():
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        pytest.skip("Pillow not installed in this environment")
+
+
 def _lev(a, b):
     if len(a) < len(b):
         a, b = b, a
@@ -123,6 +130,7 @@ class TestRealOcr:
 
 class TestTriage:
     def test_blank_and_pagenum_pages_are_blank(self, tmp_path):
+        _needs_pil()
         from PIL import Image
 
         white = tmp_path / "white.png"
@@ -133,6 +141,7 @@ class TestTriage:
         assert ocr_module.is_blank_image(num.read_bytes()) is True
 
     def test_text_page_is_not_blank(self, tmp_path):
+        _needs_pil()
         path = _render_text_image(
             "A real paragraph with several words in it.", tmp_path / "text.png")
         assert ocr_module.is_blank_image(path.read_bytes()) is False
@@ -142,6 +151,7 @@ class TestTriage:
         assert ocr_module.is_blank_image(b"\x89PNG\r\n\x1a\n\x00\x00") is False
 
     def test_stdlib_png_decoder_agrees_with_pil(self, tmp_path):
+        _needs_pil()
         from PIL import Image
 
         white = tmp_path / "w.png"
