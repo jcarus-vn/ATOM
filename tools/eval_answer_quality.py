@@ -42,6 +42,8 @@ Gold note ids must exist in the master; missing ones are reported and
 excluded from the recall denominator, never silently counted as misses.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re

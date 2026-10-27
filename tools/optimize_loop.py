@@ -45,6 +45,8 @@ Usage:
   python3 tools/optimize_loop.py --max-rounds 5 --targets '{"recall": 0.9}'
 """
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
