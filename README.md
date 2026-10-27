@@ -6,7 +6,7 @@
 
 
 <p align="center">
-<strong>Turn any technical book, paper, or web doc into a living atomic brain: one master skill per field, built from atomic notes that link, cross-check, and load on demand - ready to study, reference, and use while you work in GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, or OpenClaw.</strong></p>
+<strong>Stop paying your agent to re-read the same book every turn. Turn any technical book, paper, or web doc into a living atomic brain with ATOM - one master skill per field - that answers from sourced notes instead of guessing, at a fraction of the token cost, while you work in GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, or OpenClaw.</strong></p>
 
 <p align="center">
   <a href="https://github.com/jcarus-vn/ATOM/releases"><img src="https://img.shields.io/github/v/release/jcarus-vn/ATOM?style=for-the-badge&color=blueviolet" alt="Latest release"></a>
@@ -22,7 +22,9 @@
 > converter and adds the master-skill system: flexible chapter detection,
 > OCR for scanned PDFs and figures, web URL inputs, and field master skills
 > built from atomic notes, taxonomy, typed graph, facets, and a registry
-> (docs/master-skill.md).
+> (docs/master-skill.md). Built for projects, not casual readers: it is
+> the knowledge layer other agents and assistants plug into - feed it
+> documents, query it on demand.
 
 
 
@@ -40,14 +42,31 @@
 </p>
 
 <p align="center">
-  <strong>24×–51× fewer tokens than dumping the book into context</strong> to answer one question, measured on real books (<a href="docs/performance.md#the-discovery-loop-tax">how it's measured</a>).
+  <strong>71 tokens to find an answer, not 2,201 - on every question, every turn.</strong> Measured on a real 118-concept master skill: taxonomy lookup vs flat scan, 31x cheaper - with answer quality identical before and after compression. (<a href="docs/performance.md#the-discovery-loop-tax">how it's measured</a>)
 </p>
 
 **How it works, in 3 steps:**
 
 1. **Point** it at a file, folder, or glob - `/atom ./my-book.pdf`
-2. **It distills** the book into a skill - frameworks, decision rules, anti-patterns, and per-chapter files. Structure, not a summary.
+2. **It distills** the book into atomic notes and builds a skill - frameworks, decision rules, anti-patterns, and per-chapter files. Structure, not a summary.
 3. **Your agent loads it on demand** - ask `/my-book replication` and it reads the right chapter and answers from the real content, no hallucination.
+
+---
+
+## 💰 Token math: what it actually saves you
+
+Token cost is the whole business case. The structuring work is paid **once**, at conversion. Every query after that costs only the answer - not the book. Measured on a real 118-concept master skill:
+
+| Every time you... | Without ATOM | With ATOM |
+|-------------------|--------------|-----------|
+| Route to the right note | 2,201 tokens scanned flat | **71 tokens** via the taxonomy index (31x less) |
+| Answer a question in a session, all-in | Re-read the whole book text: about 266,000 tokens for this corpus, re-billed every turn | **about 1,506 tokens** amortized (index load + top-5 note bodies, measured over 22 questions) |
+| Store the master | 88,901 tokens / 702 KB | **34,462 tokens / 171 KB** in compact format (61% fewer tokens, 76% fewer bytes) |
+| Rank candidate notes | 14.4 ms | **1.0 ms** |
+
+Now multiply by questions, by turns, by users. A project that asks a thousand questions does not pay a thousand book-readings - it pays a thousand lookups. That gap is the product.
+
+One honest boundary: below roughly 5,000 tokens (about 10 A4 pages) dumping the document is still cheaper. ATOM is built for everything longer than that - and the longer the document, the bigger the win.
 
 ---
 
@@ -55,16 +74,16 @@
 
 <img align="right" width="200" src="docs/assets/booklin.png" alt="ATOM illustration">
 
-You buy a great technical book. You read it once. Three months later you can't remember chapter 7 existed.
+Your agent does not have a reading problem. It has a memory problem.
 
-The usual workarounds don't help:
+Every turn it re-reads the PDF, re-finds the chapter, re-pays the token bill - and still guesses when the answer is not in front of it. The usual workarounds don't help:
 - 📄 "Let me just search the PDF" → you get a list of pages, not answers
-- 🧠 "I'll ask the agent about this book" → it either hallucinates or says it doesn't have the content
-- 📝 "I'll take notes as I read" → you end up with a 200-line doc you never open again
+- 🧠 "I'll ask the agent about this book" → it answers from vibes when the content is not loaded
+- 📝 "I'll take notes as I read" → you end up with a 200-line doc nobody ever opens again
 
-**ATOM solves this by turning the book into a structured skill your agent loads on demand.**
+**ATOM turns the document into a structured skill your agent loads on demand - and into a master skill when a whole field is at stake.**
 
-Once installed, you just type `/your-book-slug replication` and the agent reads the right chapter and answers from the actual content. No hallucination. No digging through PDFs. The book becomes part of your workflow.
+Once installed, you just type `/your-book-slug replication` and the agent reads the right note and answers from sourced content. No digging through PDFs. The book becomes part of your workflow - and part of your project's brain.
 
 Works with any host that supports the open [Agent Skills](https://github.com/agentskills/agentskills) standard - GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, and OpenClaw all read the same `SKILL.md` format.
 ---
@@ -85,23 +104,30 @@ Running `/atom your-book.pdf` (or a folder, glob, or list of files) creates a fu
 
 ---
 
-## 🏢 Beyond books
+## 🚀 Where it earns its keep
 
-The name says "book", but the input is any structured prose. The same extraction works on knowledge you own and re-read constantly:
+ATOM is infrastructure for projects that need agents to actually know things. The input is any structured prose you own and re-read constantly:
 
-- **Internal documentation** - architecture decision records, runbooks, onboarding guides. Fold a whole `docs/` folder into one skill and ask it while you code.
-- **Brand & design systems** - voice guidelines, tone-of-voice docs, component principles. Turn a brand book into a skill your team queries instead of skimming a 60-page PDF.
+- **Virtual-assistant knowledge layer** - regulations, procedures, and domain docs become master skills the assistant queries. Bound views answer from one exact document, and conflicting rules stay visible as contested instead of being silently picked.
+- **Team knowledge** - architecture decision records, runbooks, onboarding guides. Fold a whole `docs/` folder into one skill and ask it while you code.
 - **Research clusters** - a stack of papers plus your own notes, merged into a single unified skill and updated as new material lands (see [Update / fold-in](#-usage)).
 - **Specs & standards** - RFCs, API contracts, compliance docs you reference but never memorize.
+- **Scanned archives** - photographed and scanned PDFs go through real OCR (Vietnamese + English measured at 0.3% character error) instead of producing empty skills.
 
-If you re-open a document often enough to wish you'd memorized it, it's a candidate.
+If your project re-opens a document often enough to wish the agent had memorized it, that document belongs in ATOM.
 
 ---
 
 
-## 🧾 The Discovery Loop Tax
+## 🧾 Measured, not promised
 
-A PDF-reading agent doesn't just read - it *navigates*: it re-fetches the ToC, backtracks, and re-processes all of it on every turn. ATOM pays that structuring cost **once**, at conversion, so queries stay proportional to the answer - **24×–51× fewer tokens** than dumping the book into context, measured on real books.
+A PDF-reading agent doesn't just read - it *navigates*: it re-fetches the ToC, backtracks, and re-processes all of it on every turn. ATOM pays that structuring cost **once**, at conversion, so queries stay proportional to the answer. Every number below was measured on this repo, not borrowed:
+
+- **Lookup: 71 tokens vs 2,201** - taxonomy index vs flat scan on a real 118-concept master skill (31x cheaper).
+- **Storage: 61% fewer tokens, 76% fewer bytes** with the compact format - and answer quality bit-identical before and after.
+- **Speed: ranking 14.4 ms down to 1.0 ms** per question on the same master.
+- **Quality, checked both ways:** a dev set and a locked holdout set (12 + 10 questions) score the same through the compact path as through the legacy path.
+- **The honest floor:** below roughly 5,000 tokens (about 10 A4 pages) dumping the document is still cheaper. ATOM earns its keep on documents longer than that - and the longer the document, the bigger the win.
 
 📊 **Full methodology, numbers, and per-book tables → [docs/performance.md](docs/performance.md#the-discovery-loop-tax)**
 

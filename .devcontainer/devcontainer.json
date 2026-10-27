@@ -1,0 +1,1 @@
+{"customizations":{"vscode":{"extensions":["ms-python.python","charliermarsh.ruff"]}},"image":"mcr.microsoft.com/devcontainers/python:3.12","name":"ATOM","postCreateCommand":"pip install -e . && pip install pytest ruff"}
