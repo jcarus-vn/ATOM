@@ -4,9 +4,9 @@ Status: **ACTIVE PLAN — planning only; no paper-derived production change is a
 
 Primary source: [He et al., *Is Progressive Disclosure All You Need for Long-Context Agents?*](https://arxiv.org/abs/2607.17598)
 
-This plan converts the paper's useful findings into a sequence of falsifiable, low-waste experiments for `book-to-skill`. It is intentionally written so another coding agent can resume from the repository, locate the next task, implement it, prove it, record evidence, and continue without reconstructing the entire discussion.
+This plan converts the paper's useful findings into a sequence of falsifiable, low-waste experiments for `ATOM`. It is intentionally written so another coding agent can resume from the repository, locate the next task, implement it, prove it, record evidence, and continue without reconstructing the entire discussion.
 
-The goal is not to copy the paper's implementation. The goal is to answer the questions the paper leaves open for the **current** `book-to-skill` architecture.
+The goal is not to copy the paper's implementation. The goal is to answer the questions the paper leaves open for the **current** `ATOM` architecture.
 
 ---
 
@@ -32,12 +32,12 @@ Only after those measurements should a paper-inspired idea change production `SK
 
 The plan may treat these as findings of the cited experiment, with the paper's scope limitations intact:
 
-- The authors evaluate a **controlled recipe based on book-to-skill**, not this repository's full current generator. Their recipe chunks by document structure (fallback ~4,000 words), generates a short summary plus `KEY_ELEMENTS`, and routes to raw chunk text.
+- The authors evaluate a **controlled recipe based on ATOM**, not this repository's full current generator. Their recipe chunks by document structure (fallback ~4,000 words), generates a short summary plus `KEY_ELEMENTS`, and routes to raw chunk text.
 - A single-level/flat skill pack is the best default in the study overall; pushing chunk descriptions into always-loaded child skills can create context pressure and can hurt.
 - The value of progressive disclosure depends on the harness. On a single book, a strong navigator such as the tested Codex setup can reconstruct `grep -> locate -> read` itself, reducing the accuracy benefit of the pre-built pack.
 - At multi-book scale, especially English open QA in the tested setup, flat disclosure degrades more slowly than raw navigation.
 - The paper's `KEY_ELEMENTS` field was **used**, but its independent contribution was **not ablated**.
-- The paper does **not** validate the current `book-to-skill` semantic representation: frameworks, mental models, anti-patterns, decision rules, glossary/patterns/cheatsheet, and the current chapter template were not the independent variable.
+- The paper does **not** validate the current `ATOM` semantic representation: frameworks, mental models, anti-patterns, decision rules, glossary/patterns/cheatsheet, and the current chapter template were not the independent variable.
 - The paper explicitly does not establish transfer to code, technical manuals, or other non-narrative corpora.
 - Cost results such as the K=20 En.QA `68.3M` vs `32.5M` token comparison are condition-specific uncached measurements, not a universal 2x claim.
 
@@ -55,7 +55,7 @@ These are hypotheses until this plan produces evidence:
 - Does adding exact routing terms/entities improve routing enough to justify extra always/activation-loaded context?
 - Can explicit/forced activation separate routing failure from representation/reasoning failure?
 - Do the paper's scaling patterns reproduce on technical books, documentation, or SOP-like material?
-- Is a library-level index useful for actual `book-to-skill` collections?
+- Is a library-level index useful for actual `ATOM` collections?
 - Does a structured chapter plus access to source evidence outperform either structure-only or raw-only?
 - Does different chunk granularity matter after routing and representation are controlled?
 
@@ -147,7 +147,7 @@ evals/
 .eval-work/            # local raw trajectories, generated packs, private corpora; gitignored
 ```
 
-Evaluation code must not become a runtime dependency of `book-to-skill` unless a later production decision explicitly promotes part of it.
+Evaluation code must not become a runtime dependency of `ATOM` unless a later production decision explicitly promotes part of it.
 
 ---
 
@@ -366,7 +366,7 @@ Fixture/replay adapter is green first. Then one intentionally tiny live smoke ru
 
 **Question**
 
-Once routing is held constant, does the current structured `book-to-skill` payload help an agent *apply* knowledge better than raw chapter text or a simple representation?
+Once routing is held constant, does the current structured `ATOM` payload help an agent *apply* knowledge better than raw chapter text or a simple representation?
 
 **Conditions**
 
@@ -443,7 +443,7 @@ Only consider adding/changing routing metadata if improvement repeats on more th
 
 **Question**
 
-Do the useful paper effects transfer to the material `book-to-skill` is commonly designed to structure: technical books, docs, standards, and SOP-like content?
+Do the useful paper effects transfer to the material `ATOM` is commonly designed to structure: technical books, docs, standards, and SOP-like content?
 
 **Corpus requirements**
 
@@ -463,7 +463,7 @@ Run the already-defined conditions; do not add new features during the replicati
 
 **Question**
 
-When does a collection-level index become useful for real non-narrative `book-to-skill` material?
+When does a collection-level index become useful for real non-narrative `ATOM` material?
 
 Do not implement `library-to-skill` in production first.
 
@@ -568,9 +568,9 @@ Agents update this table when a task changes status. Keep entries short; link to
 
 Until evidence changes, do **not** publish or encode these as established facts:
 
-- "The paper validated the full current book-to-skill generator."
+- "The paper validated the full current ATOM generator."
 - "KEY_ELEMENTS improves routing." (It was used, not independently ablated.)
-- "book-to-skill uses 2x fewer tokens." (The cited ~2x result is one specific K=20 En.QA condition.)
+- "ATOM uses 2x fewer tokens." (The cited ~2x result is one specific K=20 En.QA condition.)
 - "Skills beat RAG." (The paper compared a specific hybrid baseline under specific tasks.)
 - "Flat always beats hierarchy." (Flat is the best default overall; appendix effects are task/scale-specific.)
 - "The results apply to technical books/code." (The paper explicitly leaves non-narrative transfer open.)
@@ -608,4 +608,4 @@ This research initiative is complete only when:
 8. any adopted behavior is implemented in separate focused PRs with tests/evidence;
 9. public claims are updated only to what the measurements actually support.
 
-The success criterion is **not** "all proposed features shipped." The success criterion is that we can identify which ideas earn their complexity and which should not enter `book-to-skill`.
+The success criterion is **not** "all proposed features shipped." The success criterion is that we can identify which ideas earn their complexity and which should not enter `ATOM`.

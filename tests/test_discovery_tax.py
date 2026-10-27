@@ -88,7 +88,7 @@ class TestCountTokens:
 
 
 class TestDiscoveryTaxOrdering:
-    """The core invariant: book-to-skill < discovery < context-dump."""
+    """The core invariant: atom < discovery < context-dump."""
 
     def test_strategy_ordering(self, tmp_path, capsys):
         book = tmp_path / "full_text.txt"
@@ -115,7 +115,7 @@ class TestDiscoveryTaxOrdering:
         dump = grab("context-dump")
         d_best = grab("discovery (best)")
         d_loop = grab("discovery (loop)")
-        skill = grab("book-to-skill")
+        skill = grab("atom")
 
         assert skill < d_best < dump, (skill, d_best, dump)
         assert d_best <= d_loop, (d_best, d_loop)

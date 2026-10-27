@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from book_to_skill.config import PYTHON_DEPENDENCIES, HTML_EXTENSIONS
+from atom.config import PYTHON_DEPENDENCIES, HTML_EXTENSIONS
 
 
 # Ordered groups for the --check preflight report. Each entry describes one
@@ -283,7 +283,7 @@ def run_dependency_check() -> int:
     Returns a process exit code: 0 always (a missing optional dep is not an
     error — most formats degrade to a fallback). Intended for `extract.py --check`.
     """
-    print("book-to-skill — dependency check\n")
+    print("atom — dependency check\n")
 
     missing_pip_packages: list[str] = []
     missing_system: list[tuple[str, str]] = []  # (name, install hint)

@@ -72,13 +72,13 @@ def test_openclaw_extractor_probe_discovers_supported_layouts(tmp_path, layout):
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
 
     roots = {
-        "personal-flat": home / ".openclaw" / "skills" / "book-to-skill",
-        "personal-grouped": home / ".openclaw" / "skills" / "group" / "subgroup" / "book-to-skill",
-        "personal-deep": home / ".openclaw" / "skills" / "one" / "two" / "three" / "four" / "five" / "six" / "book-to-skill",
-        "personal-custom-state": tmp_path / "custom-openclaw-state" / "skills" / "book-to-skill",
-        "workspace-flat": project / "skills" / "book-to-skill",
-        "workspace-grouped": project / "skills" / "group" / "subgroup" / "book-to-skill",
-        "workspace-deep": project / "skills" / "one" / "two" / "three" / "four" / "five" / "six" / "book-to-skill",
+        "personal-flat": home / ".openclaw" / "skills" / "atom",
+        "personal-grouped": home / ".openclaw" / "skills" / "group" / "subgroup" / "atom",
+        "personal-deep": home / ".openclaw" / "skills" / "one" / "two" / "three" / "four" / "five" / "six" / "atom",
+        "personal-custom-state": tmp_path / "custom-openclaw-state" / "skills" / "atom",
+        "workspace-flat": project / "skills" / "atom",
+        "workspace-grouped": project / "skills" / "group" / "subgroup" / "atom",
+        "workspace-deep": project / "skills" / "one" / "two" / "three" / "four" / "five" / "six" / "atom",
     }
     extractor = roots[layout] / "scripts" / "extract.py"
     extractor.parent.mkdir(parents=True)
@@ -101,7 +101,7 @@ def test_openclaw_extractor_probe_discovers_supported_layouts(tmp_path, layout):
 
 def test_openclaw_host_layouts_are_documented():
     assert "${OPENCLAW_STATE_DIR:-~/.openclaw}/skills" in SKILL
-    assert "skills/book-to-skill/scripts/extract.py" in SKILL
+    assert "skills/atom/scripts/extract.py" in SKILL
     assert "openclaw skills list" in SKILL
     assert "OPENCLAW_STATE_DIR" in SKILL
     assert "~/.agents/skills` only with default state" in SKILL

@@ -3,8 +3,8 @@ import stat
 
 import pytest
 
-from book_to_skill.exceptions import ExtractionError
-from book_to_skill.utils import prepare_output_dir
+from atom.exceptions import ExtractionError
+from atom.utils import prepare_output_dir
 
 # Permission bits are a POSIX concept. On Windows os.chmod only toggles the
 # read-only flag and st_mode always reports 0o666/0o777, so asserting 0o700

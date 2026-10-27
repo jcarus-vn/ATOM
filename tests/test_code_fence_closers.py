@@ -9,7 +9,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.utils import _closed_fence_line_numbers, detect_structure, main
+from atom.utils import _closed_fence_line_numbers, detect_structure, main
 
 
 @pytest.mark.parametrize("marker", ["`", "~"])
@@ -78,10 +78,10 @@ def test_cli_records_real_chapters_without_removing_code_sample(tmp_path, monkey
     source.write_text(text, encoding="utf-8")
     output_dir = tmp_path / "output"
 
-    monkeypatch.setattr("book_to_skill.utils.prepare_dependencies", lambda *args: None)
-    monkeypatch.setattr("book_to_skill.utils.OUTPUT_DIR", output_dir)
-    monkeypatch.setattr("book_to_skill.utils.OUTPUT_TEXT", output_dir / "full_text.txt")
-    monkeypatch.setattr("book_to_skill.utils.OUTPUT_META", output_dir / "metadata.json")
+    monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *args: None)
+    monkeypatch.setattr("atom.utils.OUTPUT_DIR", output_dir)
+    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", output_dir / "full_text.txt")
+    monkeypatch.setattr("atom.utils.OUTPUT_META", output_dir / "metadata.json")
     monkeypatch.setattr(
         sys, "argv", ["extract.py", str(source), "--install-missing", "no"]
     )

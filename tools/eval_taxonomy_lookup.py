@@ -30,8 +30,8 @@ if __name__ == "__main__":
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from book_to_skill.master import load_master, normalize_title  # noqa: E402
-from book_to_skill.utils import estimate_tokens  # noqa: E402
+from atom.master import load_master, normalize_title  # noqa: E402
+from atom.utils import estimate_tokens  # noqa: E402
 
 
 def main() -> int:

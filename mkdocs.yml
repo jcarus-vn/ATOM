@@ -1,10 +1,10 @@
-site_name: book-to-skill
+site_name: ATOM
 site_description: >-
-  Turn any book, PDF or EPUB into a structured agent skill for Claude Code,
-  GitHub Copilot CLI and Amp — frameworks and decision rules, loaded on demand.
-site_url: https://booktoskill.is-a.dev/
-repo_url: https://github.com/virgiliojr94/book-to-skill
-repo_name: virgiliojr94/book-to-skill
+  Turn books, papers, and web docs into a living atomic brain: one master
+  skill per field, built from atomic notes, taxonomy, graph, and registry.
+site_url: https://jcarus-vn.github.io/ATOM/
+repo_url: https://github.com/jcarus-vn/ATOM
+repo_name: jcarus-vn/ATOM
 edit_uri: ""
 
 # index.md is a committed landing page. Guide (README.md) and Skill Reference

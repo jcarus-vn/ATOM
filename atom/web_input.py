@@ -25,9 +25,9 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-from book_to_skill.parsers.html import extract_html_content
+from atom.parsers.html import extract_html_content
 
-USER_AGENT = "book-to-skill/1.4 (+local fetch, no login, no paywall bypass)"
+USER_AGENT = "atom/1.4 (+local fetch, no login, no paywall bypass)"
 TIMEOUT_SECONDS = 30
 
 _AD_LIKE = re.compile(

@@ -2,7 +2,7 @@
 
 ## Scope
 
-book-to-skill is a local conversion tool. It reads document files you point it at
+ATOM is a local conversion tool. It reads document files you point it at
 and writes skill files to your skills directory. It does **not** upload your files,
 phone home, or run a network service. The main security surface is:
 

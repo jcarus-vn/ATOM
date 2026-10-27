@@ -1,5 +1,5 @@
 ---
-description: "Turn any book, PDF or EPUB into a structured agent skill for Claude Code, GitHub Copilot CLI, Amp, Codex, Hermes Agent, OpenCode, and OpenClaw. Named frameworks and decision rules, loaded on demand."seo_title: "book-to-skill - Turn Any Book Into an AI Agent Skill"
+description: "Turn any book, PDF or EPUB into a structured agent skill for Claude Code, GitHub Copilot CLI, Amp, Codex, Hermes Agent, OpenCode, and OpenClaw. Named frameworks and decision rules, loaded on demand."seo_title: "ATOM - Turn Any Book Into an AI Agent Skill"
 hide:
   - navigation
   - toc
@@ -9,30 +9,30 @@ hide:
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "book-to-skill",
+  "name": "ATOM",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Linux, macOS, Windows",
-"description": "Converts books and documents (PDF, EPUB, DOCX, HTML, Markdown, RTF, MOBI/AZW) into structured, on-demand agent skills for Claude Code, GitHub Copilot CLI, Amp, Codex, Hermes Agent, OpenCode, and OpenClaw.",  "url": "https://booktoskill.is-a.dev/",
-  "codeRepository": "https://github.com/virgiliojr94/book-to-skill",
+"description": "Converts books and documents (PDF, EPUB, DOCX, HTML, Markdown, RTF, MOBI/AZW) into structured, on-demand agent skills for Claude Code, GitHub Copilot CLI, Amp, Codex, Hermes Agent, OpenCode, and OpenClaw.",  "url": "https://jcarus-vn.github.io/ATOM/",
+  "codeRepository": "https://github.com/jcarus-vn/ATOM",
   "license": "https://opensource.org/licenses/MIT",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "author": { "@type": "Person", "name": "virgiliojr94", "url": "https://github.com/virgiliojr94" }
+  "author": { "@type": "Person", "name": "jcarus-vn", "url": "https://github.com/jcarus-vn" }
 }
 </script>
 
-# book-to-skill
+# ATOM
 
 <p style="font-size: 1.25rem; max-width: 42rem;">
-Turn any book or document into a structured, on-demand agent skill — named frameworks, decision rules, and anti-patterns. <strong>Structure, not a summary.</strong>
+Turn any book or document into a structured, on-demand agent skill - named frameworks, decision rules, and anti-patterns. <strong>Structure, not a summary.</strong>
 </p>
 
 [Get started](guide.md){ .md-button .md-button--primary }
 [Skill reference](skill-reference.md){ .md-button }
-[GitHub](https://github.com/virgiliojr94/book-to-skill){ .md-button }
+[GitHub](https://github.com/jcarus-vn/ATOM){ .md-button }
 
 ---
 
-## Why book-to-skill
+## Why ATOM
 
 <div class="grid cards" markdown>
 
@@ -41,13 +41,13 @@ Turn any book or document into a structured, on-demand agent skill — named fra
     ---
 
     PDF, EPUB, DOCX, HTML, Markdown, RTF, MOBI/AZW (via Calibre). Extraction runs
-    locally with graceful stdlib fallbacks — no upload, no lock-in.
+    locally with graceful stdlib fallbacks - no upload, no lock-in.
 
 -   :material-brain:{ .lg .middle } __Structure, not summaries__
 
     ---
 
-    Named frameworks, mental models, decision rules, and anti-patterns — the
+    Named frameworks, mental models, decision rules, and anti-patterns - the
     author's toolkit, captured with their exact terms, not a book report.
 
 -   :material-flash:{ .lg .middle } __On-demand chapters__
@@ -67,21 +67,21 @@ One `SKILL.md` runs on Claude Code, GitHub Copilot CLI, Amp, Codex, Hermes Agent
 
 ## Install
 
-**As an agent skill** (gives you the `/book-to-skill` command in Claude Code, Copilot CLI, Amp, Codex, Hermes Agent, OpenCode, or OpenClaw):
+**As an agent skill** (gives you the `/atom` command in Claude Code, Copilot CLI, Amp, Codex, Hermes Agent, OpenCode, or OpenClaw):
 ```bash
-npx skills add virgiliojr94/book-to-skill
+npx skills add jcarus-vn/ATOM
 # or manually:
-git clone https://github.com/virgiliojr94/book-to-skill.git ~/.claude/skills/book-to-skill
+git clone https://github.com/jcarus-vn/ATOM.git ~/.claude/skills/atom
 # then, in your agent session:
-/book-to-skill /path/to/book.pdf [skill-name]
+/atom /path/to/book.pdf [skill-name]
 ```
 
 **As a standalone CLI** (just the text extractor, optional):
 
 ```bash
-# not on PyPI yet — pip takes it from the repository
-pip install "book-to-skill[pdf,epub,docx] @ git+https://github.com/virgiliojr94/book-to-skill.git"
-book-to-skill /path/to/book.pdf --mode text
+# not on PyPI yet - pip takes it from the repository
+pip install "atom[pdf,epub,docx] @ git+https://github.com/jcarus-vn/ATOM.git"
+ATOM /path/to/book.pdf --mode text
 ```
 
 ## Learn more
@@ -105,11 +105,5 @@ book-to-skill /path/to/book.pdf --mode text
     ---
 
     The full `SKILL.md` spec: every step, depth budget, and quality rule.
-
--   :material-heart:{ .lg .middle } __[Sponsor](https://github.com/sponsors/virgiliojr94)__
-
-    ---
-
-    book-to-skill is free and MIT. Sponsoring funds reviews, releases, and fixes.
 
 </div>

@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.master import build_master, load_master, normalize_title
-from book_to_skill.utils import estimate_tokens
+from atom.master import build_master, load_master, normalize_title
+from atom.utils import estimate_tokens
 
 SOURCE = {
     "name": "Book A", "kind": "book",

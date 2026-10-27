@@ -1,17 +1,17 @@
 ---
-description: "How book-to-skill is built: a deterministic Python extractor plus a spec-driven agent generator. Pipeline, component map, and the design tradeoffs behind both."
-seo_title: "Architecture - How book-to-skill Extracts and Generates"
+description: "How ATOM is built: a deterministic Python extractor plus a spec-driven agent generator. Pipeline, component map, and the design tradeoffs behind both."
+seo_title: "Architecture - How ATOM Extracts and Generates"
 ---
 
 # Architecture
 
-book-to-skill has two halves: a **deterministic extractor** (Python) and a
+ATOM has two halves: a **deterministic extractor** (Python) and a
 **spec-driven generator** (the agent following `SKILL.md`). The extractor turns any
 document into clean text + metadata; the agent turns that into a structured skill.
 
 ```
             ┌─────────────────────────── EXTRACTOR (Python, deterministic) ──┐
- documents  │  scripts/extract.py (shim)  →  book_to_skill/                   │
+ documents  │  scripts/extract.py (shim)  →  atom/                   │
  (pdf/epub/ │    ├─ cli.py · utils.py   CLI parse · multi-source · runner     │
   docx/...) │    ├─ config.py           supported extensions · paths · deps   │
      │      │    ├─ dependencies.py     optional-dep probing · --check report │
@@ -78,12 +78,12 @@ converter does not infer arbitrary `skills.load.extraDirs`.
 
 | Path | Responsibility |
 |------|----------------|
-| `scripts/extract.py` | thin entrypoint shim → `book_to_skill.cli` (kept so old invocations keep working) |
-| `book_to_skill/cli.py`, `utils.py` | CLI parsing, multi-source resolution, chapter/ToC detection, runner |
-| `book_to_skill/parsers/` | one module per format (`pdf`, `epub`, `docx`, `html`, `rtf`, `calibre`, `text`) |
-| `book_to_skill/config.py` | supported extensions, output paths, dependency map |
-| `book_to_skill/dependencies.py` | optional-dependency probing + `--check` |
-| `book_to_skill/sanitize.py` | strips zero-width / Unicode-tag-block characters from extracted text, and folds Kangxi radicals to their ideographs (see Security) |
+| `scripts/extract.py` | thin entrypoint shim → `atom.cli` (kept so old invocations keep working) |
+| `atom/cli.py`, `utils.py` | CLI parsing, multi-source resolution, chapter/ToC detection, runner |
+| `atom/parsers/` | one module per format (`pdf`, `epub`, `docx`, `html`, `rtf`, `calibre`, `text`) |
+| `atom/config.py` | supported extensions, output paths, dependency map |
+| `atom/dependencies.py` | optional-dependency probing + `--check` |
+| `atom/sanitize.py` | strips zero-width / Unicode-tag-block characters from extracted text, and folds Kangxi radicals to their ideographs (see Security) |
 | `tools/discovery_tax.py` | measures token cost vs context-dump / discovery loop |
 | `tools/validate_skill.py` | checks a generated SKILL.md against host rules (`--lens claude\|copilot\|amp\|hermes\|openclaw`) |
 | `tools/validate_skill.py` | checks a generated SKILL.md against host rules (`--lens claude\|copilot\|amp\|hermes\|opencode`) |
@@ -96,12 +96,12 @@ Untrusted documents flow into an agent's context and then into a generated skill
 that later loads into other agents — a document→context supply chain. The hardening
 is layered:
 
-- **Extraction sanitization** (`book_to_skill/sanitize.py`) — strips zero-width
+- **Extraction sanitization** (`atom/sanitize.py`) — strips zero-width
   (`U+200B/200C/200D/2060/FEFF`) and the Unicode tag block (`U+E0000–E007F`) from
   every parser's output before metrics or `full_text.txt`, so invisible
   document-borne instructions never reach the agent. Reports the removal count;
   rejects a source with no visible content left.
-- **CJK radical folding** (`book_to_skill/sanitize.py`) — PDFs whose embedded
+- **CJK radical folding** (`atom/sanitize.py`) — PDFs whose embedded
   font subset carries no correct Unicode mapping emit a Kangxi radical
   (`U+2F00–U+2FDF`) where a character belongs, so a Chinese book extracts
   "判断⼒" for "判断力". Each radical in that block has a Unicode compatibility
@@ -125,7 +125,7 @@ is layered:
 
 ## Extending
 
-- **New format** → add `book_to_skill/parsers/<fmt>.py`, register its extension in
+- **New format** → add `atom/parsers/<fmt>.py`, register its extension in
   `config.py`, wire dependency probing in `dependencies.py`, branch in
   `utils.extract_single_file`.
 - **New generation behavior** → edit the relevant Step in `SKILL.md`; keep it lean

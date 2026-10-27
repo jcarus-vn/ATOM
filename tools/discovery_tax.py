@@ -10,7 +10,7 @@ into an agent's context to answer one targeted question:
                       pulls raw chapters until it locates the answer (and, per
                       Kyle Parratt's critique, backtracks for missing
                       definitions). These fetched pages land in history.
-  3. book-to-skill  — a small resident SKILL.md core + one pre-compiled chapter
+  3. atom  — a small resident SKILL.md core + one pre-compiled chapter
                       loaded on demand.
 
 Honesty notes:
@@ -38,7 +38,7 @@ import sys
 # otherwise write __pycache__/*.pyc beside the sources, leaving build artifacts
 # inside the skill. `__name__` is bound before the module body runs, so this
 # holds for a direct invocation and never mutates an embedding process that
-# merely imports this module. Must be set BEFORE `book_to_skill` is imported.
+# merely imports this module. Must be set BEFORE `atom` is imported.
 if __name__ == "__main__":
     sys.dont_write_bytecode = True
 from pathlib import Path
@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Reuse the extractor's ToC detection too (multilingual + CJK), so discovery_tax
 # and the pipeline agree on what a ToC is — the stale local regex here only
 # matched EN/ES/PT and silently missed FR/DE/IT/NL/CJK books.
-from book_to_skill.utils import (  # noqa: E402
+from atom.utils import (  # noqa: E402
     _chapter_number as chapter_number,
     _TOC_PATTERN as toc_pattern,
 )
@@ -148,7 +148,7 @@ def main() -> int:
     prior = best_chapter(chapters, n - 1, count_tokens)
     prior_raw = prior[1] if prior else 0
 
-    # book-to-skill resident cost
+    # atom resident cost
     if args.skill_dir:
         sd = Path(args.skill_dir)
         skill_md = sd / "SKILL.md"
@@ -188,9 +188,9 @@ def main() -> int:
     print(f"    context-dump      : {dump:>9,}   (resident, re-billed EVERY turn)")
     print(f"    discovery (best)  : {disc_best:>9,}   ToC ({toc_tok:,}) + raw target chapter ({target_raw:,})")
     print(f"    discovery (loop)  : {disc_loop:>9,}   + 1 prior chapter for a missing definition ({prior_raw:,})")
-    print(f"    book-to-skill     : {skill:>9,}   core [{core_label}] ({core:,}) + compiled chapter ({comp_chapter:,})\n")
+    print(f"    atom     : {skill:>9,}   core [{core_label}] ({core:,}) + compiled chapter ({comp_chapter:,})\n")
 
-    print("  book-to-skill advantage:")
+    print("  atom advantage:")
     print(f"    vs context-dump   : {ratio(dump, skill)} fewer tokens")
     print(f"    vs discovery best : {ratio(disc_best, skill)} fewer tokens")
     print(f"    vs discovery loop : {ratio(disc_loop, skill)} fewer tokens")

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://booktoskill.is-a.dev/sitemap.xml
+Sitemap: https://jcarus-vn.github.io/ATOM/sitemap.xml

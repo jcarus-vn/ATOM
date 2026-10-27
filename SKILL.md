@@ -1,5 +1,5 @@
 ---
-name: book-to-skill
+name: atom
 description: "Converts books and documents (PDF, EPUB, DOCX, HTML, Markdown, plain text, RTF, MOBI/AZW with Calibre) into structured agent skills, extracting frameworks, mental models, principles, techniques, and anti-patterns. Use when the user wants to study a document through GitHub Copilot CLI, Amp, Claude Code, Hermes Agent, OpenCode, or OpenClaw, apply an author's frameworks while working, or build a reusable knowledge base from a file."
 ---
 
@@ -97,7 +97,7 @@ For **generated** book skills, prefer the user-level cross-agent root `~/.agents
 ## Step 0 — Out-of-scope check
 
 If no arguments are provided, stop and respond:
-> "book-to-skill requires a supported document path, folder, or glob pattern. Usage: `book-to-skill <path-to-document-folder-or-glob>... [skill-name-slug]`"
+> "atom requires a supported document path, folder, or glob pattern. Usage: `atom <path-to-document-folder-or-glob>... [skill-name-slug]`"
 
 Throughout the workflow:
 - **Resolve the destination root first.** Before any existing-skill lookup, determine where this run would write: the personal or project-local root for the user's host, per the Step 5 table and selection rules — a project-local request uses its project-local root, never the personal root. Below, "the resolved root" means that destination.
@@ -105,7 +105,7 @@ Throughout the workflow:
 - If the last argument is not a file, folder, or glob that exists or matches any files, and it looks like a skill slug (e.g. lowercase hyphens, alphanumeric), treat it as `SKILL_NAME`.
 - Treat all other arguments as the list of `INPUT_PATHS`.
 - If any input path is an existing skill directory (contains `SKILL.md` and a `chapters/` sub-folder), or if `SKILL_NAME` matches an existing skill slug in the resolved root, flag this run as an **Update/Fold-in** operation (Mode 4).
-- **Re-run guard.** Before starting extraction for a Full Conversion, derive the prospective skill slug under Step 5's naming options — the author-concept form, the by-title form, and any `SKILL_NAME` given — and check the resolved root for an existing match. On a match, STOP and ask the user: "`<skill-name>` already exists. Choose: (1) Update/Fold-in (Mode 4), (2) verify the existing skill is complete and stop, or (3) force full regeneration." Do not re-extract until the user chooses. On context recovery after an interrupted run (network cut-off, replayed or continued conversation), reuse the extraction work directory that run reported (`Workdir ->` in its output, or the path you set in `BOOK_SKILL_WORKDIR`) **only if it is still intact and still matches the current inputs and options** — the directory exists, its `metadata.json` is readable, the `sources` it lists match the files being converted now one-to-one on filename **and content fingerprint** (the extractor records a per-source `sha256` in `metadata.json`; recompute the fingerprint from each file as it exists now and require an exact match — `reuse_is_safe()` in `book_to_skill/utils.py` is the executable form of this check), and its recorded `extraction_mode` is the mode this run is using (Step 2's "confirm the extraction is the document you asked for" rule). If it is missing (temp cleanup), its `metadata.json` is gone, the sources no longer match (a different filename, or a changed content fingerprint), the recorded metadata has no `sha256` for a source (recorded before fingerprints existed, so freshness cannot be established), or the mode differs, say so and start a fresh extraction instead of resuming. When in doubt, ask the user before discarding or resuming.
+- **Re-run guard.** Before starting extraction for a Full Conversion, derive the prospective skill slug under Step 5's naming options — the author-concept form, the by-title form, and any `SKILL_NAME` given — and check the resolved root for an existing match. On a match, STOP and ask the user: "`<skill-name>` already exists. Choose: (1) Update/Fold-in (Mode 4), (2) verify the existing skill is complete and stop, or (3) force full regeneration." Do not re-extract until the user chooses. On context recovery after an interrupted run (network cut-off, replayed or continued conversation), reuse the extraction work directory that run reported (`Workdir ->` in its output, or the path you set in `BOOK_SKILL_WORKDIR`) **only if it is still intact and still matches the current inputs and options** — the directory exists, its `metadata.json` is readable, the `sources` it lists match the files being converted now one-to-one on filename **and content fingerprint** (the extractor records a per-source `sha256` in `metadata.json`; recompute the fingerprint from each file as it exists now and require an exact match — `reuse_is_safe()` in `atom/utils.py` is the executable form of this check), and its recorded `extraction_mode` is the mode this run is using (Step 2's "confirm the extraction is the document you asked for" rule). If it is missing (temp cleanup), its `metadata.json` is gone, the sources no longer match (a different filename, or a changed content fingerprint), the recorded metadata has no `sha256` for a source (recorded before fingerprints existed, so freshness cannot be established), or the mode differs, say so and start a fresh extraction instead of resuming. When in doubt, ask the user before discarding or resuming.
 
 ---
 
@@ -160,19 +160,19 @@ then
 fi
 
 CANDIDATES=(
-  "$HOME/.copilot/skills/book-to-skill/scripts/extract.py"
-  "$HOME/.agents/skills/book-to-skill/scripts/extract.py"
-  "$HOME/.claude/skills/book-to-skill/scripts/extract.py"
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills/book-to-skill/scripts/extract.py"
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/book-to-skill/scripts/extract.py
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/book-to-skill/scripts/extract.py
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/book-to-skill/scripts/extract.py
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/*/book-to-skill/scripts/extract.py
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/*/*/book-to-skill/scripts/extract.py
-  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/*/*/*/book-to-skill/scripts/extract.py
-  "$HOME/.config/opencode/skills/book-to-skill/scripts/extract.py"
-  "$HERMES_HOME_RESOLVED/skills/book-to-skill/scripts/extract.py"
-  "$HERMES_HOME_RESOLVED"/skills/*/book-to-skill/scripts/extract.py
+  "$HOME/.copilot/skills/atom/scripts/extract.py"
+  "$HOME/.agents/skills/atom/scripts/extract.py"
+  "$HOME/.claude/skills/atom/scripts/extract.py"
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills/atom/scripts/extract.py"
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/atom/scripts/extract.py
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/atom/scripts/extract.py
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/atom/scripts/extract.py
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/*/atom/scripts/extract.py
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/*/*/atom/scripts/extract.py
+  "${OPENCLAW_STATE_DIR_RESOLVED}/skills"/*/*/*/*/*/*/atom/scripts/extract.py
+  "$HOME/.config/opencode/skills/atom/scripts/extract.py"
+  "$HERMES_HOME_RESOLVED/skills/atom/scripts/extract.py"
+  "$HERMES_HOME_RESOLVED"/skills/*/atom/scripts/extract.py
 )
 if [ "${HERMES_AGENT:-}" != true ]; then
   # Project-local roots are resolved against the git worktree, not the current
@@ -182,47 +182,47 @@ if [ "${HERMES_AGENT:-}" != true ]; then
   # so the probe also works outside a git repository.
   if [ -n "$PROJECT_ROOT" ]; then
     CANDIDATES+=(
-      "$PROJECT_ROOT/.github/skills/book-to-skill/scripts/extract.py"
-      "$PROJECT_ROOT/.claude/skills/book-to-skill/scripts/extract.py"
-      "$PROJECT_ROOT/.agents/skills/book-to-skill/scripts/extract.py"
-      "$PROJECT_ROOT/.opencode/skills/book-to-skill/scripts/extract.py"
+      "$PROJECT_ROOT/.github/skills/atom/scripts/extract.py"
+      "$PROJECT_ROOT/.claude/skills/atom/scripts/extract.py"
+      "$PROJECT_ROOT/.agents/skills/atom/scripts/extract.py"
+      "$PROJECT_ROOT/.opencode/skills/atom/scripts/extract.py"
     )
   fi
   CANDIDATES+=(
-    ".github/skills/book-to-skill/scripts/extract.py"
-    ".claude/skills/book-to-skill/scripts/extract.py"
-    ".agents/skills/book-to-skill/scripts/extract.py"
-    "skills/book-to-skill/scripts/extract.py"
-    "skills"/*/book-to-skill/scripts/extract.py
-    "skills"/*/*/book-to-skill/scripts/extract.py
-    "skills"/*/*/*/book-to-skill/scripts/extract.py
-    "skills"/*/*/*/*/book-to-skill/scripts/extract.py
-    "skills"/*/*/*/*/*/book-to-skill/scripts/extract.py
-    "skills"/*/*/*/*/*/*/book-to-skill/scripts/extract.py
-    ".opencode/skills/book-to-skill/scripts/extract.py"
+    ".github/skills/atom/scripts/extract.py"
+    ".claude/skills/atom/scripts/extract.py"
+    ".agents/skills/atom/scripts/extract.py"
+    "skills/atom/scripts/extract.py"
+    "skills"/*/atom/scripts/extract.py
+    "skills"/*/*/atom/scripts/extract.py
+    "skills"/*/*/*/atom/scripts/extract.py
+    "skills"/*/*/*/*/atom/scripts/extract.py
+    "skills"/*/*/*/*/*/atom/scripts/extract.py
+    "skills"/*/*/*/*/*/*/atom/scripts/extract.py
+    ".opencode/skills/atom/scripts/extract.py"
   )
   if [ -n "$PROJECT_ROOT" ]; then
     CANDIDATES+=(
-      "$PROJECT_ROOT/skills/book-to-skill/scripts/extract.py"
-      "$PROJECT_ROOT/skills"/*/book-to-skill/scripts/extract.py
-      "$PROJECT_ROOT/skills"/*/*/book-to-skill/scripts/extract.py
-      "$PROJECT_ROOT/skills"/*/*/*/book-to-skill/scripts/extract.py
-      "$PROJECT_ROOT/skills"/*/*/*/*/book-to-skill/scripts/extract.py
-      "$PROJECT_ROOT/skills"/*/*/*/*/*/book-to-skill/scripts/extract.py
-      "$PROJECT_ROOT/skills"/*/*/*/*/*/*/book-to-skill/scripts/extract.py
+      "$PROJECT_ROOT/skills/atom/scripts/extract.py"
+      "$PROJECT_ROOT/skills"/*/atom/scripts/extract.py
+      "$PROJECT_ROOT/skills"/*/*/atom/scripts/extract.py
+      "$PROJECT_ROOT/skills"/*/*/*/atom/scripts/extract.py
+      "$PROJECT_ROOT/skills"/*/*/*/*/atom/scripts/extract.py
+      "$PROJECT_ROOT/skills"/*/*/*/*/*/atom/scripts/extract.py
+      "$PROJECT_ROOT/skills"/*/*/*/*/*/*/atom/scripts/extract.py
     )
   fi
 fi
 CANDIDATES+=(
-  "$HOME/.config/agents/skills/book-to-skill/scripts/extract.py"
-  "$HOME/.config/amp/skills/book-to-skill/scripts/extract.py"
+  "$HOME/.config/agents/skills/atom/scripts/extract.py"
+  "$HOME/.config/amp/skills/atom/scripts/extract.py"
 )
 if [ "$HERMES_PROJECT_TRUSTED" = true ]; then
   CANDIDATES=(
-    "$PROJECT_ROOT/.hermes/skills/book-to-skill/scripts/extract.py"
-    "$PROJECT_ROOT/.hermes/skills"/*/book-to-skill/scripts/extract.py
-    "$PROJECT_ROOT/.agents/skills/book-to-skill/scripts/extract.py"
-    "$PROJECT_ROOT/.agents/skills"/*/book-to-skill/scripts/extract.py
+    "$PROJECT_ROOT/.hermes/skills/atom/scripts/extract.py"
+    "$PROJECT_ROOT/.hermes/skills"/*/atom/scripts/extract.py
+    "$PROJECT_ROOT/.agents/skills/atom/scripts/extract.py"
+    "$PROJECT_ROOT/.agents/skills"/*/atom/scripts/extract.py
     "${CANDIDATES[@]}"
   )
 fi
@@ -235,7 +235,7 @@ do
 done
 
 if [ -z "$SCRIPT_PATH" ]; then
-  echo "Could not find scripts/extract.py for book-to-skill" >&2
+  echo "Could not find scripts/extract.py for atom" >&2
   exit 1
 fi
 
@@ -793,7 +793,7 @@ If the user declines, stop here. Requirements: the `gh` CLI, authenticated (chec
 
 If accepted:
 
-1. Add a repo `README.md` inside `$SKILLS_HOME/<skill_name>/` (never overwrite an existing file) — the skill title, a one-paragraph description ("Agent skill generated from *<Title>* by <Author> with [book-to-skill](https://github.com/virgiliojr94/book-to-skill)"), the install command from step 3 below, the file inventory, and a note that the content is synthesized summaries, not the book text.
+1. Add a repo `README.md` inside `$SKILLS_HOME/<skill_name>/` (never overwrite an existing file) — the skill title, a one-paragraph description ("Agent skill generated from *<Title>* by <Author> with [ATOM](https://github.com/jcarus-vn/ATOM)"), the install command from step 3 below, the file inventory, and a note that the content is synthesized summaries, not the book text.
 2. Initialize the skill folder as a git repository and create the remote (default repo name `<skill_name>`; let the user override — some prefer a `<skill_name>-skill` suffix). **Nested-repo guard:** first check whether the skill folder already sits inside a git repository (`git -C "$SKILLS_HOME/<skill_name>" rev-parse --show-toplevel` — always the case for project-local roots like `.claude/skills/`). If it does, do NOT `git init` in place: the outer repository would record the folder as an embedded repo (gitlink, mode 160000) without `.gitmodules`, and fresh clones of the outer project would silently omit the skill. Instead, copy the skill folder to a scratch directory, run the commands below from the copy, and tell the user the published repo — not the project-local folder — is the remote's working copy.
 
 ```bash

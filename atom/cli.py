@@ -4,11 +4,11 @@ import sys
 # otherwise write __pycache__/*.pyc beside the sources, leaving build artifacts
 # inside the skill. `__name__` is bound before the module body runs, so this
 # holds for a direct invocation and never mutates an embedding process that
-# merely imports this module. Must be set BEFORE `book_to_skill` is imported.
+# merely imports this module. Must be set BEFORE `atom` is imported.
 if __name__ == "__main__":
     sys.dont_write_bytecode = True
-from book_to_skill.utils import main as utils_main
-from book_to_skill.pdf_inspector_integration import (
+from atom.utils import main as utils_main
+from atom.pdf_inspector_integration import (
     enrich_pdf_inspector_metadata,
     install_pdf_inspector_hook,
 )

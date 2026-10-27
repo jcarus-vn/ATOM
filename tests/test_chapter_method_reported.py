@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.utils import detect_structure
+from atom.utils import detect_structure
 
 CHAPTER_BODY = "prose carrying the section's actual content. " * 40
 

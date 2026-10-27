@@ -1,6 +1,6 @@
 ---
-description: "Measured token cost of book-to-skill: 24x-51x fewer tokens than dumping a book into context, the Discovery Loop Tax, and per-book tables you can reproduce."
-seo_title: "Performance & Token Cost - book-to-skill Benchmarks"
+description: "Measured token cost of ATOM: 24x-51x fewer tokens than dumping a book into context, the Discovery Loop Tax, and per-book tables you can reproduce."
+seo_title: "Performance & Token Cost - ATOM Benchmarks"
 ---
 
 # Performance & Cost
@@ -36,10 +36,10 @@ tables and code as markdown. Pick text mode for prose, technical mode for code/t
 
 ## The Discovery Loop Tax
 
-Tokens entering context to answer **one** targeted question. book-to-skill loads a
+Tokens entering context to answer **one** targeted question. ATOM loads a
 resident core (~4K) plus one compiled chapter (~1K) ≈ **5,000 tokens**.
 
-| Book (chapter size) | Context-dump | Discovery loop | book-to-skill | vs dump / loop |
+| Book (chapter size) | Context-dump | Discovery loop | ATOM | vs dump / loop |
 |---------------------|-------------:|---------------:|--------------:|:--------------:|
 | Think Python 2 (small) | 119,264 | 12,152 | ~5,000 | 24× / 2.4× |
 | Working Backwards (medium) | 175,253 | 33,444 | ~5,000 | 35× / 6.7× |

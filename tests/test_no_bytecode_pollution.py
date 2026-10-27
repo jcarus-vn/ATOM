@@ -1,6 +1,6 @@
 """Regression test: keep bytecode out of the deployed skill, from entry points.
 
-When book-to-skill is installed as an agent skill, the skill *is* the source
+When atom is installed as an agent skill, the skill *is* the source
 tree — it is cloned or unpacked into `~/.config/opencode/skills/<name>/` (or
 another host root) and executed from there. Any `__pycache__` written on first
 run ends up shipped inside the skill: extra files to scan, noise in diffs, and
@@ -10,7 +10,7 @@ The agent invoking the skill does not set PYTHONDONTWRITEBYTECODE, so the guard
 has to live in the entry points themselves, before the package is imported.
 
 The guard does NOT belong at import time in a library module: a host process
-that merely does `import book_to_skill` must not have its global
+that merely does `import atom` must not have its global
 `sys.dont_write_bytecode` flipped underneath it. `if __name__ == "__main__":`
 is false for such an import, which is why the policy is wrapped in it.
 
@@ -45,20 +45,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # `utils.print_intro`), so the presence check reads stdout + stderr; the point
 # is that output is non-empty and expected, not that it lands on a stream.
 ENTRY_POINTS = {
-    "scripts/extract.py": "book-to-skill · turns a document into a structured agent skill",
+    "scripts/extract.py": "atom · turns a document into a structured agent skill",
     "scripts/build_master.py": "usage: build_master.py [-h]",
     "tools/scan_generated_skill.py": "usage: scan_generated_skill.py [-h] path",
     "tools/discovery_tax.py": (
         "usage: discovery_tax.py [-h] --full-text FULL_TEXT [--skill-dir SKILL_DIR]"
     ),
     "tools/eval_taxonomy_lookup.py": "usage: eval_taxonomy_lookup.py [-h]",
-    "book_to_skill/cli.py": "book-to-skill · turns a document into a structured agent skill",
+    "atom/cli.py": "atom · turns a document into a structured agent skill",
 }
 
 # Everything the four entry points import. Copied into the isolated deployment
-# so the runs under test resolve `book_to_skill` to the copy, not to the
+# so the runs under test resolve `atom` to the copy, not to the
 # developer's checkout.
-PAYLOAD = ("book_to_skill", "scripts", "tools")
+PAYLOAD = ("atom", "scripts", "tools")
 
 # The exact marker the policy must sit inside.
 MAIN_GUARD = 'if __name__ == "__main__":'
@@ -182,11 +182,11 @@ def test_entry_points_set_the_policy_before_importing_the_package():
         import_at = next(
             i
             for i, line in enumerate(lines)
-            if line.lstrip().startswith(("from book_to_skill", "import book_to_skill"))
+            if line.lstrip().startswith(("from atom", "import atom"))
         )
         assert "sys.dont_write_bytecode = True" in "\n".join(lines[guard_at:import_at]), (
             f"{entry} must set sys.dont_write_bytecode inside its `__main__` "
-            "guard and before importing book_to_skill"
+            "guard and before importing atom"
         )
 
 
@@ -201,7 +201,7 @@ def test_entry_point_list_still_matches_the_source_tree():
         except OSError:
             continue
         imports_package = any(
-            line.lstrip().startswith(("from book_to_skill", "import book_to_skill"))
+            line.lstrip().startswith(("from atom", "import atom"))
             for line in lines
         )
         if not imports_package:
@@ -214,8 +214,8 @@ def test_entry_point_list_still_matches_the_source_tree():
 
     # `__main__.py`/`__init__.py` cannot be guarded from inside the package:
     # Python compiles them before any of our code runs. They are excluded here
-    # and instead SKILL.md must never invoke `python -m book_to_skill`.
-    found -= {"book_to_skill/__main__.py", "book_to_skill/__init__.py"}
+    # and instead SKILL.md must never invoke `python -m atom`.
+    found -= {"atom/__main__.py", "atom/__init__.py"}
 
     assert found == set(ENTRY_POINTS), (
         "entry points changed; update ENTRY_POINTS and make sure every one sets "
@@ -227,7 +227,7 @@ def test_importing_the_library_does_not_mutate_the_embedding_process(deployed):
     """Importing the package must not flip `sys.dont_write_bytecode`.
 
     This is the direct regression guard for the policy leaking out of a library
-    import: an embedding host that imports book-to-skill keeps its own global
+    import: an embedding host that imports atom keeps its own global
     interpreter state. Run in a subprocess whose CWD/PYTHONPATH are the isolated
     copy, so it cannot silently import the developer's checkout instead.
     """
@@ -240,9 +240,9 @@ def test_importing_the_library_does_not_mutate_the_embedding_process(deployed):
             (
                 "import sys\n"
                 "sys.dont_write_bytecode = False\n"
-                "import book_to_skill, book_to_skill.utils, book_to_skill.cli\n"
-                f"assert book_to_skill.__file__.startswith({str(deployed)!r}), "
-                "book_to_skill.__file__\n"
+                "import atom, atom.utils, atom.cli\n"
+                f"assert atom.__file__.startswith({str(deployed)!r}), "
+                "atom.__file__\n"
                 "print(sys.dont_write_bytecode)\n"
             ),
         ],
@@ -253,7 +253,7 @@ def test_importing_the_library_does_not_mutate_the_embedding_process(deployed):
         f"import probe failed ({completed.returncode}): {completed.stderr.strip()[:300]}"
     )
     assert completed.stdout.strip() == "False", (
-        "importing book_to_skill mutated the embedding process: "
+        "importing atom mutated the embedding process: "
         f"sys.dont_write_bytecode is {completed.stdout.strip()!r}"
     )
 

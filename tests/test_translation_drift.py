@@ -1,50 +1,30 @@
-"""Keep translated destination policy and Russian headings from regressing."""
+"""ATOM ships English-only docs: no translated READMEs are kept.
 
-import re
+The old project carried Russian and Chinese README translations that
+drifted from the English source and still pointed at the old repository.
+ATOM drops them outright rather than shipping stale translations: this
+test pins that decision so a re-added translation file fails loudly
+instead of silently going stale again.
+"""
+
 from pathlib import Path
-
-import pytest
-
 
 ROOT = Path(__file__).parents[1]
 
-POLICY_TERMS = {
-    "README.ru.md": ("символьную ссылку", "проверяет её чтением"),
-    "README.zh-CN.md": ("符号链接", "回读验证"),
-}
+REMOVED_TRANSLATIONS = ("README.ru.md", "README.zh-CN.md")
 
 
-@pytest.mark.parametrize(("path", "translated_terms"), POLICY_TERMS.items())
-def test_translated_destination_policy_is_pinned_and_complete(path, translated_terms):
-    text = (ROOT / path).read_text(encoding="utf-8")
-
-    assert re.search(
-        r"<!-- translation-meta: source=README\.md@[0-9a-f]{40} "
-        r"date=\d{4}-\d{2}-\d{2} scope=destination-policy(?: [^>]*)? -->",
-        text,
-    )
-    required_terms = (
-        "~/.agents/skills/<slug>/",
-        "~/.claude/skills/<slug>/",
-        "OPENCLAW_STATE_DIR",
-        "HERMES_HOME",
-        *translated_terms,
-    )
-    assert all(term in text for term in required_terms)
+def test_no_translated_readmes_remain():
+    for name in REMOVED_TRANSLATIONS:
+        assert not (ROOT / name).exists(), (
+            f"{name} is back in the tree; ATOM docs are English-only — "
+            "do not re-add a translation without a sync policy"
+        )
 
 
-def test_russian_section_headings_are_localized():
-    text = (ROOT / "README.ru.md").read_text(encoding="utf-8")
-    headings = {line for line in text.splitlines() if line.startswith("## ")}
-
-    assert {
-        "## 🧾 Цена цикла поиска",
-        "## ⚙️ Как это работает",
-        "## 🚀 Использование",
-        "## 📥 Установка",
-        "## ❓ Частые вопросы",
-        "## ⚖️ Авторское право и добросовестное использование",
-        "## 💖 Спонсоры",
-        "## Лицензия",
-        "## История звёзд",
-    } <= headings
+def test_english_readme_has_no_translation_links():
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    for name in REMOVED_TRANSLATIONS:
+        assert name not in text
+    assert "Русский" not in text
+    assert "简体中文" not in text

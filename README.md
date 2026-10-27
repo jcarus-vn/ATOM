@@ -1,43 +1,27 @@
 <p align="center">
-  <img src="docs/assets/banner.webp" alt="Booklin, the book-to-skill wizard, holding an open book whose pages scatter into sparkles that settle into an ordered grid" width="100%">
+  <img src="docs/assets/banner.webp" alt="ATOM banner" width="100%">
 </p>
 
-<h1 align="center">book-to-skill</h1>
+<h1 align="center">ATOM</h1>
+
 
 <p align="center">
-  <a href="README.md"><strong>English</strong></a> ·
-  <a href="README.ru.md">Русский</a> ·
-  <a href="README.zh-CN.md">简体中文</a>
-</p>
+<strong>Turn any technical book, paper, or web doc into a living atomic brain: one master skill per field, built from atomic notes that link, cross-check, and load on demand - ready to study, reference, and use while you work in GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, or OpenClaw.</strong></p>
 
 <p align="center">
-<strong>Turn any technical book, document folder, or collection of sources into a unified agent skill — ready to study, reference, and use while you work in GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, or OpenClaw.</strong></p>
-
-<p align="center">
-  <a href="https://github.com/virgiliojr94/book-to-skill/releases"><img src="https://img.shields.io/github/v/release/virgiliojr94/book-to-skill?style=for-the-badge&color=blueviolet" alt="Latest release"></a>
+  <a href="https://github.com/jcarus-vn/ATOM/releases"><img src="https://img.shields.io/github/v/release/jcarus-vn/ATOM?style=for-the-badge&color=blueviolet" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Agent_Skills-Open_Standard-blueviolet?style=for-the-badge" alt="Agent Skills standard">
   <img src="https://img.shields.io/badge/PDF%20%E2%80%A2%20EPUB%20%E2%80%A2%20DOCX%20%E2%80%A2%20MD%20%E2%80%A2%20HTML%20%E2%80%A2%20RTF%20%E2%80%A2%20MOBI-supported-green?style=for-the-badge" alt="Formats supported">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License">
-  <a href="https://github.com/sponsors/virgiliojr94"><img src="https://img.shields.io/github/sponsors/virgiliojr94?style=for-the-badge&color=ea4aaa&logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
 
-<p align="center">
-  <a href="https://trendshift.io/repositories/27038?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-27038" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/27038" alt="virgiliojr94%2Fbook-to-skill | Trendshift" width="250" height="55"/></a>
-  <a href="https://trendshift.io/repositories/27038?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-27038" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/27038/daily?language=Python" alt="virgiliojr94%2Fbook-to-skill | Trendshift (daily, Python)" width="250" height="55"/></a>
-   <a href="https://www.star-history.com/virgiliojr94/book-to-skill"><img src="https://api.star-history.com/badge?repo=virgiliojr94/book-to-skill&type=rank" alt="Star History Rank" /></a>
-</p>
 
-> **ATOM - Atomic Thought Organizing Machine.** This is a standalone
-> project based on the original
+> **ATOM - Atomic Thought Organizing Machine.** A standalone project based on
 > [virgiliojr94/book-to-skill](https://github.com/virgiliojr94/book-to-skill)
-> (MIT, original author credited in full; the license is unchanged), not a
-> GitHub fork. It keeps the original book-to-skill converter and adds a
-> master-skill system on top: flexible chapter detection (Roman numerals,
-> bare titles, Vietnamese chapter words, ToC anchoring, section fallback -
-> docs/chapter-detection.md), OCR for scanned PDFs and embedded figures
-> with an opt-in vision hook (docs/ocr-figures.md), web URL inputs
-> (docs/web-input.md), and field master skills with atomic notes,
-> taxonomy, typed graph, facets, and a central registry
+> (MIT; original author credited in LICENSE). It keeps the original
+> converter and adds the master-skill system: flexible chapter detection,
+> OCR for scanned PDFs and figures, web URL inputs, and field master skills
+> built from atomic notes, taxonomy, typed graph, facets, and a registry
 > (docs/master-skill.md).
 
 
@@ -61,15 +45,15 @@
 
 **How it works, in 3 steps:**
 
-1. **Point** it at a file, folder, or glob — `/book-to-skill ./my-book.pdf`
-2. **It distills** the book into a skill — frameworks, decision rules, anti-patterns, and per-chapter files. Structure, not a summary.
-3. **Your agent loads it on demand** — ask `/my-book replication` and it reads the right chapter and answers from the real content, no hallucination.
+1. **Point** it at a file, folder, or glob - `/atom ./my-book.pdf`
+2. **It distills** the book into a skill - frameworks, decision rules, anti-patterns, and per-chapter files. Structure, not a summary.
+3. **Your agent loads it on demand** - ask `/my-book replication` and it reads the right chapter and answers from the real content, no hallucination.
 
 ---
 
 ## 🤔 Why
 
-<img align="right" width="200" src="docs/assets/booklin.png" alt="Booklin — the book-to-skill mascot, a purple wizard holding a book">
+<img align="right" width="200" src="docs/assets/booklin.png" alt="ATOM illustration">
 
 You buy a great technical book. You read it once. Three months later you can't remember chapter 7 existed.
 
@@ -78,16 +62,16 @@ The usual workarounds don't help:
 - 🧠 "I'll ask the agent about this book" → it either hallucinates or says it doesn't have the content
 - 📝 "I'll take notes as I read" → you end up with a 200-line doc you never open again
 
-**book-to-skill solves this by turning the book into a structured skill your agent loads on demand.**
+**ATOM solves this by turning the book into a structured skill your agent loads on demand.**
 
 Once installed, you just type `/your-book-slug replication` and the agent reads the right chapter and answers from the actual content. No hallucination. No digging through PDFs. The book becomes part of your workflow.
 
-Works with any host that supports the open [Agent Skills](https://github.com/agentskills/agentskills) standard — GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, and OpenClaw all read the same `SKILL.md` format.
+Works with any host that supports the open [Agent Skills](https://github.com/agentskills/agentskills) standard - GitHub Copilot CLI, Amp, Claude Code, Codex, Hermes Agent, OpenCode, and OpenClaw all read the same `SKILL.md` format.
 ---
 
 ## 📦 What it generates
 
-Running `/book-to-skill your-book.pdf` (or a folder, glob, or list of files) creates a full skill in the user-level cross-agent skills directory `~/.agents/skills/<slug>/` — one copy that Copilot CLI, Amp, Codex, OpenCode, and OpenClaw discover natively (OpenCode also reads its own managed root `~/.config/opencode/skills/<slug>/`; OpenClaw also discovers it when using its default state directory, with a non-default `OPENCLAW_STATE_DIR` use the active state's `skills/` root instead). When run under Claude Code, the converter also attempts a verified symlink at `~/.claude/skills/<slug>/` — Claude Code sees the skill when the link read-back confirms it; otherwise the run report says so. Hermes Agent partitions its personal skills by category and does not scan the cross-agent root, so a Hermes install lands in `/skills/<category>/<slug>/` instead. OpenClaw-managed, OpenCode-managed, and project-local destinations remain available when explicitly requested:
+Running `/atom your-book.pdf` (or a folder, glob, or list of files) creates a full skill in the user-level cross-agent skills directory `~/.agents/skills/<slug>/` - one copy that Copilot CLI, Amp, Codex, OpenCode, and OpenClaw discover natively (OpenCode also reads its own managed root `~/.config/opencode/skills/<slug>/`; OpenClaw also discovers it when using its default state directory, with a non-default `OPENCLAW_STATE_DIR` use the active state's `skills/` root instead). When run under Claude Code, the converter also attempts a verified symlink at `~/.claude/skills/<slug>/` - Claude Code sees the skill when the link read-back confirms it; otherwise the run report says so. Hermes Agent partitions its personal skills by category and does not scan the cross-agent root, so a Hermes install lands in `/skills/<category>/<slug>/` instead. OpenClaw-managed, OpenCode-managed, and project-local destinations remain available when explicitly requested:
 
 | File | Purpose | Size |
 |------|---------|------|
@@ -97,7 +81,7 @@ Running `/book-to-skill your-book.pdf` (or a folder, glob, or list of files) cre
 | `patterns.md` | All techniques, algorithms, and design patterns | ~2,000 tokens |
 | `cheatsheet.md` | Decision tables and quick-reference rules | ~1,000 tokens |
 
-**Chapter files are loaded on-demand** — they don't count against the skill budget until you ask about that topic.
+**Chapter files are loaded on-demand** - they don't count against the skill budget until you ask about that topic.
 
 ---
 
@@ -105,10 +89,10 @@ Running `/book-to-skill your-book.pdf` (or a folder, glob, or list of files) cre
 
 The name says "book", but the input is any structured prose. The same extraction works on knowledge you own and re-read constantly:
 
-- **Internal documentation** — architecture decision records, runbooks, onboarding guides. Fold a whole `docs/` folder into one skill and ask it while you code.
-- **Brand & design systems** — voice guidelines, tone-of-voice docs, component principles. Turn a brand book into a skill your team queries instead of skimming a 60-page PDF.
-- **Research clusters** — a stack of papers plus your own notes, merged into a single unified skill and updated as new material lands (see [Update / fold-in](#-usage)).
-- **Specs & standards** — RFCs, API contracts, compliance docs you reference but never memorize.
+- **Internal documentation** - architecture decision records, runbooks, onboarding guides. Fold a whole `docs/` folder into one skill and ask it while you code.
+- **Brand & design systems** - voice guidelines, tone-of-voice docs, component principles. Turn a brand book into a skill your team queries instead of skimming a 60-page PDF.
+- **Research clusters** - a stack of papers plus your own notes, merged into a single unified skill and updated as new material lands (see [Update / fold-in](#-usage)).
+- **Specs & standards** - RFCs, API contracts, compliance docs you reference but never memorize.
 
 If you re-open a document often enough to wish you'd memorized it, it's a candidate.
 
@@ -117,7 +101,7 @@ If you re-open a document often enough to wish you'd memorized it, it's a candid
 
 ## 🧾 The Discovery Loop Tax
 
-A PDF-reading agent doesn't just read — it *navigates*: it re-fetches the ToC, backtracks, and re-processes all of it on every turn. book-to-skill pays that structuring cost **once**, at conversion, so queries stay proportional to the answer — **24×–51× fewer tokens** than dumping the book into context, measured on real books.
+A PDF-reading agent doesn't just read - it *navigates*: it re-fetches the ToC, backtracks, and re-processes all of it on every turn. ATOM pays that structuring cost **once**, at conversion, so queries stay proportional to the answer - **24×–51× fewer tokens** than dumping the book into context, measured on real books.
 
 📊 **Full methodology, numbers, and per-book tables → [docs/performance.md](docs/performance.md#the-discovery-loop-tax)**
 
@@ -131,28 +115,52 @@ Two halves: a deterministic Python **extractor** (document → clean text + meta
 
 ---
 
+## 🧠 Inside ATOM
+
+ATOM keeps the converter, then builds a brain on top of it:
+
+```
+sources (books, papers, web docs)
+  -> atomic notes (one concept per note, sourced, consensus / contested / single-source)
+  -> taxonomy index + typed graph + facets + registry
+  -> one master skill per field, queryable on demand
+```
+
+**Tech stack:** Python 3.9+ extractor (pypdf, pdfminer, Docling for
+technical books, ebooklib, python-docx, trafilatura for web), OCR via
+ocrmypdf/tesseract with an opt-in vision hook for figures, and a
+spec-driven generator (`SKILL.md`) that distills structure, not summaries.
+Extraction runs locally; your files are never uploaded by the tool.
+
+**Why it matters:** a flat pile of notes costs tokens on every question.
+ATOM's taxonomy index routes straight to the right note: 65 tokens vs 364
+scanning flat on a measured 12-concept fixture (docs/master-skill.md).
+Cross-checked concepts merge into one note; disagreements stay visible as
+contested, with both sides and sources, instead of being silently picked
+for you.
+
 ## 🚀 Usage
 
-`/book-to-skill <path|folder|glob> [skill-name]` — plus analyze-only, generate-from-analysis, and update/fold-in modes. After a conversion, the converter can publish the skill to GitHub (private by default) so any host installs it with `npx skills add`.
+`/atom <path|folder|glob> [skill-name]` - plus analyze-only, generate-from-analysis, and update/fold-in modes. After a conversion, the converter can publish the skill to GitHub (private by default) so any host installs it with `npx skills add`.
 
 ▶️ **All modes and examples → [docs/usage.md](docs/usage.md)**
 
-💬 **In practice → [use cases](https://github.com/virgiliojr94/book-to-skill-use-cases)** — a DevEx book became a survey of 300+ engineers; a scanned PDF that stalled became [#130](https://github.com/virgiliojr94/book-to-skill/pull/130). Add yours: the account lives in your own Gist, the index takes a one-line PR.
+💬 **In practice → [master skills](docs/master-skill.md)** - one field, one master skill: a 12-concept taxonomy lookup costs 65 tokens through the index vs 364 scanning notes flat (measured fixture).
 
 ---
 
 ## 📥 Install
 
 ```bash
-# One command, any host — via the cross-agent skills CLI:
-npx skills add virgiliojr94/book-to-skill
+# One command, any host - via the cross-agent skills CLI:
+npx skills add jcarus-vn/ATOM
 
-# Or manually — clone into your skills folder (registers /book-to-skill):
-git clone https://github.com/virgiliojr94/book-to-skill.git ~/.claude/skills/book-to-skill
+# Or manually - clone into your skills folder (registers /atom):
+git clone https://github.com/jcarus-vn/ATOM.git ~/.claude/skills/atom
 # (Copilot CLI: ~/.copilot/skills/ · Amp/cross-agent: ~/.agents/skills/)
 # (Hermes Agent: ${HERMES_HOME:-$HOME/.hermes}/skills/<category>/)
 # (OpenClaw: ${OPENCLAW_STATE_DIR:-$HOME/.openclaw}/skills/; ~/.agents/skills/ only with default state)
-# (OpenCode: ~/.agents/skills/ — it also reads ~/.config/opencode/skills/)
+# (OpenCode: ~/.agents/skills/ - it also reads ~/.config/opencode/skills/)
 ```
 
 📥 **All hosts, optional extractors, and the standalone CLI → [docs/install.md](docs/install.md)**
@@ -161,7 +169,7 @@ git clone https://github.com/virgiliojr94/book-to-skill.git ~/.claude/skills/boo
 
 ## ❓ FAQ
 
-Common questions — "why not just dump the PDF?", cost, privacy, non-book inputs, multi-file books.
+Common questions - "why not just dump the PDF?", cost, privacy, non-book inputs, multi-file books.
 
 ❓ **Answers → [docs/faq.md](docs/faq.md)**
 
@@ -173,9 +181,9 @@ Common questions — "why not just dump the PDF?", cost, privacy, non-book input
 
 The extractor tries tools in order per format and uses the first available. If nothing is installed, it tells you which command to run. Plain text, Markdown, reStructuredText and AsciiDoc need no extra deps.
 
-> **Check your setup in one command:** `python3 scripts/extract.py --check` prints which extractors are installed for every format and the exact command to install anything missing — no file needed.
+> **Check your setup in one command:** `python3 scripts/extract.py --check` prints which extractors are installed for every format and the exact command to install anything missing - no file needed.
 
-**PDF — choose by book type:**
+**PDF - choose by book type:**
 
 | Book type | Tool | Install | Speed |
 |-----------|------|---------|-------|
@@ -186,7 +194,7 @@ The extractor tries tools in order per format and uses the first available. If n
 
 > Before extraction begins, the skill asks you whether the book is **technical** or **text-heavy** and picks the right tool automatically. Docling preserves markdown tables and code blocks; pdftotext is faster for prose-only books.
 
-> **Scanned PDFs need OCR first.** A PDF that is page images with no text layer — a photographed or scanned book — has nothing for these tools to extract. The extractor checks the first pages and stops immediately with an explanation, rather than working through the whole book to produce an empty skill. Run OCR yourself, then convert the result:
+> **Scanned PDFs need OCR first.** A PDF that is page images with no text layer - a photographed or scanned book - has nothing for these tools to extract. The extractor checks the first pages and stops immediately with an explanation, rather than working through the whole book to produce an empty skill. Run OCR yourself, then convert the result:
 >
 > ```bash
 > ocrmypdf input.pdf output.pdf
@@ -197,7 +205,7 @@ The extractor tries tools in order per format and uses the first available. If n
 | Tool | Install | Quality |
 |------|---------|---------|
 | `ebooklib` + `beautifulsoup4` | `pip3 install ebooklib beautifulsoup4` | ⭐⭐⭐ Best |
-| stdlib `zipfile` | built-in — no install needed | ⭐⭐ Always available |
+| stdlib `zipfile` | built-in - no install needed | ⭐⭐ Always available |
 
 **Other formats:**
 
@@ -207,7 +215,7 @@ The extractor tries tools in order per format and uses the first available. If n
 | HTML | `beautifulsoup4` (fallback: stdlib `html.parser`) | `pip3 install beautifulsoup4` |
 | RTF | `striprtf` (fallback: regex) | `pip3 install striprtf` |
 | MOBI / AZW / AZW3 | Calibre `ebook-convert` (external app, not pip) | https://calibre-ebook.com/download |
-| TXT / Markdown / reStructuredText / AsciiDoc | built-in | — |
+| TXT / Markdown / reStructuredText / AsciiDoc | built-in | - |
 
 ---
 
@@ -219,23 +227,23 @@ The extractor tries tools in order per format and uses the first available. If n
 
 
 ```
-book-to-skill/
+ATOM/
 ├── SKILL.md              # Skill definition + step-by-step instructions (the generator spec)
 ├── scripts/
-│   ├── extract.py        # Thin entrypoint wrapper
-│   └── extractor/        # Modular extraction package
-│       ├── config.py     # Extensions, paths, dependency constants
-│       ├── dependencies.py  # optional-dep probing + --check
-│       ├── exceptions.py # ExtractionError (per-source failures, batch-safe)
-│       ├── utils.py      # CLI parsing, multi-source resolution, chapter detection, runner
-│       └── parsers/      # Format-specific parsers (pdf, epub, docx, html, rtf, calibre, text)
+│   ├── extract.py        # Thin entrypoint wrapper (books, docs, web URLs, scanned PDFs)
+│   └── build_master.py   # Build a field master skill from skills + notes
+├── atom/        # Deterministic extraction package
+│   ├── chapter_detection.py  # Flexible chapter splitting
+│   ├── master.py             # Atomic notes, taxonomy, graph, facets, registry
+│   ├── ocr.py                # Scanned-PDF OCR + figure blocks, opt-in vision hook
+│   ├── web_input.py          # Web URL inputs
+│   ├── parsers/              # Format parsers (pdf, epub, docx, html, rtf, calibre, text)
+│   └── ...                   # config, dependencies, sanitize, utils, cli
 ├── tools/
-│   ├── discovery_tax.py  # measures token cost vs context-dump / discovery loop
-│   └── validate_skill.py # checks a generated SKILL.md against host rules (--lens claude|copilot|amp|hermes|opencode)
-├── tests/                # pytest suite (extraction, detection, discovery tax)
-├── docs/
-│   ├── performance.md    # measured benchmarks, discovery tax, cost
-│   └── architecture.md   # pipeline + component map
+│   ├── eval_taxonomy_lookup.py  # Measures taxonomy-index vs flat-scan token cost
+│   └── validate_skill.py        # Checks a generated SKILL.md against host rules
+├── tests/                # pytest suite (extraction, detection, master skills)
+├── docs/                 # Guide, architecture, performance, master-skill docs
 ├── CHANGELOG.md          # release history (semver)
 ├── CONTRIBUTING.md       # dev setup, PR conventions, release process
 ├── SECURITY.md           # vulnerability reporting
@@ -250,29 +258,19 @@ book-to-skill/
 ---
 ## ⚖️ Copyright & fair use
 
-book-to-skill ships **no book content** — not a single page. It's a converter you point at files you already own.
+ATOM ships **no book content** - not a single page. It's a converter you point at files you already own.
 
-- **Processing is local.** Extraction and analysis run on your machine. Your files are never uploaded by this tool. (If your agent's model runs in the cloud, the text you feed it follows that provider's normal data terms — same as any prompt.)
+- **Processing is local.** Extraction and analysis run on your machine. Your files are never uploaded by this tool. (If your agent's model runs in the cloud, the text you feed it follows that provider's normal data terms - same as any prompt.)
 - **You use your own copy.** Bring a book you bought, docs your company owns, or papers you have the right to read.
-- **The output is your notes.** A generated skill is a structured, synthesized derivative — framework names, definitions, takeaways — not a reproduction of the text. The skill explicitly never copies raw passages (see Quality Rule #7). Treat it like handwritten study notes: yours, for personal use.
+- **The output is your notes.** A generated skill is a structured, synthesized derivative - framework names, definitions, takeaways - not a reproduction of the text. The skill explicitly never copies raw passages (see Quality Rule #7). Treat it like handwritten study notes: yours, for personal use.
 - **Don't redistribute.** Publishing or sharing a generated skill of a copyrighted work can infringe the rights holder. Keep skills of third-party books private. Internal docs, your own writing, and openly-licensed material are fine to share within the bounds of their license.
 
 When in doubt, follow the license or terms of the source document. This project is a tool; how you use it is on you.
 
 ---
 
-## 💖 Sponsors
-
-<img align="right" width="150" src="docs/assets/booklin-celebrating.png" alt="Booklin celebrating">
-
-book-to-skill is free and MIT-licensed, maintained on personal time. If it saves you tokens or study hours, consider sponsoring its upkeep: PR reviews, multilingual fixes, releases, and docs.
-
-**[Become a sponsor → github.com/sponsors/virgiliojr94](https://github.com/sponsors/virgiliojr94)**
-
-Every sponsor is listed in [BACKERS.md](BACKERS.md). Thank you for keeping open, privacy-first tooling alive. ✨
-
 ## License
 
-MIT — applies to the converter (code + skill definition) in this repository, **not** to any book or document you process with it.
+MIT - applies to the converter (code + skill definition) in this repository, **not** to any book or document you process with it.
 
 

@@ -1,7 +1,7 @@
-"""Two quiet messages: attribution at the start, funding at the end.
+"""Two quiet messages: attribution at the start, closing line at the end.
 
-The ask sits at the end on purpose — the reader has just received something
-that worked — and only when the run succeeded. Asking someone to fund a tool
+The closing line sits at the end on purpose — the reader has just received
+something that worked — and only when the run succeeded. Announcing a tool
 that just failed on their document is the fastest way to make the line
 invisible.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill import utils
+from atom import utils
 
 
 class TestIntro:
@@ -20,7 +20,7 @@ class TestIntro:
         utils.print_intro()
 
         err = capsys.readouterr().err
-        assert "book-to-skill" in err
+        assert "atom" in err
         assert "MIT-licensed" in err
 
     def test_does_not_ask_for_money(self, capsys):
@@ -32,11 +32,11 @@ class TestIntro:
 
 
 class TestSupportNote:
-    def test_points_at_the_sponsors_page(self, capsys):
+    def test_names_the_project(self, capsys):
         utils.print_support_note()
 
         out = capsys.readouterr().out
-        assert "github.com/sponsors/virgiliojr94" in out
+        assert "atom" in out
 
     def test_goes_to_stdout_with_the_rest_of_the_report(self, capsys):
         """stderr is unbuffered and stdout is not when piped — mixing the two

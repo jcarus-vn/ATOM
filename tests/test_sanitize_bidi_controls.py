@@ -20,7 +20,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from book_to_skill.sanitize import is_invisible_codepoint, sanitize_extracted_text
+from atom.sanitize import is_invisible_codepoint, sanitize_extracted_text
 
 # The full bidi formatting set: marks, embeddings, overrides, isolates.
 BIDI_CONTROLS = (

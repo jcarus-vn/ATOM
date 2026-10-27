@@ -10,8 +10,8 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill import web_input
-from book_to_skill.master import build_master, load_master, query_across_masters
+from atom import web_input
+from atom.master import build_master, load_master, query_across_masters
 
 HTML = """<html><head><title>Decision Lab Notes</title></head><body>
 <nav><ul><li>Home</li><li>About</li></ul></nav>

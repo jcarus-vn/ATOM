@@ -7,7 +7,7 @@ import sys
 import zipfile
 from urllib.parse import unquote, urlsplit
 
-from book_to_skill.parsers.html import _HTMLTextExtractor
+from atom.parsers.html import _HTMLTextExtractor
 
 
 _IMAGE_EXTENSIONS = (

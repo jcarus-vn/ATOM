@@ -12,7 +12,7 @@ import sys
 # otherwise write __pycache__/*.pyc beside the sources, leaving build artifacts
 # inside the skill. `__name__` is bound before the module body runs, so this
 # holds for a direct invocation and never mutates an embedding process that
-# merely imports this module. Must be set BEFORE `book_to_skill` is imported.
+# merely imports this module. Must be set BEFORE `atom` is imported.
 if __name__ == "__main__":
     sys.dont_write_bytecode = True
 from dataclasses import dataclass
@@ -30,7 +30,7 @@ SUPPORTING_FILENAMES = ("glossary.md", "patterns.md", "cheatsheet.md")
 # extractor did not strip U+2060 while this scanner flagged it, so a generated
 # skill was warned about a character extraction was meant to have removed.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from book_to_skill.sanitize import is_invisible_codepoint  # noqa: E402
+from atom.sanitize import is_invisible_codepoint  # noqa: E402
 
 _CONTENT_RULES = (
     (
@@ -156,7 +156,7 @@ def _walk_markdown(directory: Path) -> list[Path]:
 def unscanned_markdown(path: Path) -> list[str]:
     """Markdown files present in the skill directory but outside the scan scope.
 
-    The scope is deliberately bounded to what book-to-skill generates (SKILL.md,
+    The scope is deliberately bounded to what atom generates (SKILL.md,
     the supporting files, and ``chapters/``), so unrelated notes in the directory
     are not scanned and cannot raise false findings. The risk is the *reporting*:
     printing "scan passed" while files the agent will happily read went unopened

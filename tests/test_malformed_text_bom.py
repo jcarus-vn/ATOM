@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-import book_to_skill.utils as utils
-from book_to_skill.exceptions import ExtractionError
-from book_to_skill.parsers.text import read_text_file
+import atom.utils as utils
+from atom.exceptions import ExtractionError
+from atom.parsers.text import read_text_file
 
 
 @pytest.mark.parametrize(

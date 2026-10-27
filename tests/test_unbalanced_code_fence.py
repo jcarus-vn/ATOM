@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.utils import _closed_fence_line_numbers, _structural_chapter_count
+from atom.utils import _closed_fence_line_numbers, _structural_chapter_count
 
 SECTIONS = [
     "## Getting Started\nInstall the toolchain.\n",

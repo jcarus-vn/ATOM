@@ -7,8 +7,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from book_to_skill.config import OUTPUT_DIR
-from book_to_skill.exceptions import ExtractionError
+from atom.config import OUTPUT_DIR
+from atom.exceptions import ExtractionError
 
 
 def extract_with_ebook_convert(input_path: str) -> str | None:

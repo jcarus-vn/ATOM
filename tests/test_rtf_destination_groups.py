@@ -19,7 +19,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.parsers.rtf import strip_rtf_fallback
+from atom.parsers.rtf import strip_rtf_fallback
 
 # A realistic header: font table, colour table, stylesheet, generator, \info.
 FULL_HEADER_RTF = (

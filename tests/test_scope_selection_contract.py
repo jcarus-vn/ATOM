@@ -1,4 +1,4 @@
-"""Scope-selection contract documented by the book-to-skill skill."""
+"""Scope-selection contract documented by the atom skill."""
 
 import re
 from pathlib import Path

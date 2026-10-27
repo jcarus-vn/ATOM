@@ -4,9 +4,9 @@ from unittest import mock
 
 import pytest
 
-from book_to_skill.exceptions import ExtractionError
-from book_to_skill.sanitize import sanitize_extracted_text
-from book_to_skill.utils import extract_single_file, main
+from atom.exceptions import ExtractionError
+from atom.sanitize import sanitize_extracted_text
+from atom.utils import extract_single_file, main
 
 
 INVISIBLE_CODEPOINTS = (
@@ -47,7 +47,7 @@ def test_extract_single_file_sanitizes_before_metrics(tmp_path, capsys):
         encoding="utf-8",
     )
 
-    with mock.patch("book_to_skill.utils.prepare_dependencies"):
+    with mock.patch("atom.utils.prepare_dependencies"):
         result = extract_single_file(source, "text", "no")
 
     assert result["text"] == "No customer PII leaves the repo."
@@ -61,7 +61,7 @@ def test_extract_single_file_rejects_invisible_only_source(tmp_path):
     source = tmp_path / "invisible.txt"
     source.write_text(INVISIBLE_CODEPOINTS, encoding="utf-8")
 
-    with mock.patch("book_to_skill.utils.prepare_dependencies"):
+    with mock.patch("atom.utils.prepare_dependencies"):
         with pytest.raises(ExtractionError, match="no visible content"):
             extract_single_file(source, "text", "no")
 
@@ -77,10 +77,10 @@ def test_main_writes_only_sanitized_text_and_metrics(tmp_path, monkeypatch):
     output_meta = output_dir / "metadata.json"
 
     monkeypatch.setattr(sys, "argv", ["extract.py", str(source)])
-    monkeypatch.setattr("book_to_skill.utils.OUTPUT_DIR", output_dir)
-    monkeypatch.setattr("book_to_skill.utils.OUTPUT_TEXT", output_text)
-    monkeypatch.setattr("book_to_skill.utils.OUTPUT_META", output_meta)
-    monkeypatch.setattr("book_to_skill.utils.prepare_dependencies", lambda *args: None)
+    monkeypatch.setattr("atom.utils.OUTPUT_DIR", output_dir)
+    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", output_text)
+    monkeypatch.setattr("atom.utils.OUTPUT_META", output_meta)
+    monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *args: None)
 
     main()
 

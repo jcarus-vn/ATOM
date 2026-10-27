@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from book_to_skill.master import (  # noqa: E402
+from atom.master import (  # noqa: E402
     build_master,
     list_masters,
     load_master,

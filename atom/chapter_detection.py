@@ -1,6 +1,6 @@
 """Flexible chapter detection.
 
-The historical detector in ``book_to_skill.utils`` only counts explicit
+The historical detector in ``atom.utils`` only counts explicit
 "Chapter N" style headings (plus a structural Markdown fallback). Books that
 organize chapters as bare titles (Moby-Dick: "Loomings", "The Carpet-Bag"),
 Roman numerals without the word "Chapter", or a table of contents with page
@@ -23,7 +23,7 @@ merges their results:
 
 Every returned chapter records which strategies found it and a confidence
 value, so a consumer can tell a TOC-anchored chapter from a guessed one.
-The module is dependency-free and does not import ``book_to_skill.utils``
+The module is dependency-free and does not import ``atom.utils``
 (the reverse import would be circular); ``utils.detect_structure`` calls in.
 """
 

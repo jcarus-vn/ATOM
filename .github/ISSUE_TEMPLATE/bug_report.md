@@ -21,4 +21,4 @@ labels: bug
 ## Environment
 - OS:
 - Python version:
-- book-to-skill version / commit:
+- ATOM version / commit:

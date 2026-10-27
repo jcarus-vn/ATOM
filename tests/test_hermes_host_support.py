@@ -57,10 +57,10 @@ def test_hermes_extractor_probe_discovers_supported_layouts(tmp_path, layout):
     nested.mkdir(parents=True)
 
     roots = {
-        "personal-flat": hermes_home / "skills" / "book-to-skill",
-        "personal-category": hermes_home / "skills" / "productivity" / "book-to-skill",
-        "project-flat": project / ".hermes" / "skills" / "book-to-skill",
-        "project-category": project / ".hermes" / "skills" / "productivity" / "book-to-skill",
+        "personal-flat": hermes_home / "skills" / "atom",
+        "personal-category": hermes_home / "skills" / "productivity" / "atom",
+        "project-flat": project / ".hermes" / "skills" / "atom",
+        "project-category": project / ".hermes" / "skills" / "productivity" / "atom",
     }
     extractor = roots[layout] / "scripts" / "extract.py"
     extractor.parent.mkdir(parents=True)
@@ -98,13 +98,13 @@ def test_hermes_project_extractor_precedes_personal_installation(
     nested = project / "src" / "nested"
     nested.mkdir(parents=True)
 
-    personal = hermes_home / "skills" / "productivity" / "book-to-skill" / "scripts" / "extract.py"
+    personal = hermes_home / "skills" / "productivity" / "atom" / "scripts" / "extract.py"
     project_local = (
         project
         / project_skill_dir
         / "skills"
         / "productivity"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )
@@ -142,7 +142,7 @@ def test_untrusted_hermes_project_cannot_override_personal_installation(
         hermes_home
         / "skills"
         / "productivity"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )
@@ -151,7 +151,7 @@ def test_untrusted_hermes_project_cannot_override_personal_installation(
         / project_skill_dir
         / "skills"
         / "productivity"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )
@@ -183,7 +183,7 @@ def test_untrusted_project_candidate_is_not_executed(tmp_path, project_skill_dir
         project
         / project_skill_dir
         / "skills"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )
@@ -216,7 +216,7 @@ def test_hermes_ignores_foreign_project_roots_when_trusted(
         project
         / project_skill_dir
         / "skills"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )
@@ -242,8 +242,8 @@ def test_non_hermes_host_keeps_original_personal_precedence(tmp_path):
     project.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
 
-    personal = home / ".agents" / "skills" / "book-to-skill" / "scripts" / "extract.py"
-    project_local = project / ".agents" / "skills" / "book-to-skill" / "scripts" / "extract.py"
+    personal = home / ".agents" / "skills" / "atom" / "scripts" / "extract.py"
+    project_local = project / ".agents" / "skills" / "atom" / "scripts" / "extract.py"
     for extractor in (personal, project_local):
         extractor.parent.mkdir(parents=True)
         extractor.touch()
@@ -271,7 +271,7 @@ def test_hermes_project_candidates_require_enclosing_git_root(tmp_path):
         hermes_home
         / "skills"
         / "productivity"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )
@@ -280,7 +280,7 @@ def test_hermes_project_candidates_require_enclosing_git_root(tmp_path):
         / ".hermes"
         / "skills"
         / "productivity"
-        / "book-to-skill"
+        / "atom"
         / "scripts"
         / "extract.py"
     )

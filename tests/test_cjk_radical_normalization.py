@@ -16,7 +16,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.sanitize import (
+from atom.sanitize import (
     _KANGXI_RADICAL_RANGE,
     fold_cjk_radicals,
     sanitize_extracted_text,
@@ -92,6 +92,6 @@ class TestSanitizeExtractionPath:
 
     def test_radicals_are_not_reported_as_invisible(self):
         """is_invisible_codepoint drives the scanner; a radical must not drift in."""
-        from book_to_skill.sanitize import is_invisible_codepoint
+        from atom.sanitize import is_invisible_codepoint
 
         assert is_invisible_codepoint(0x2F00) is False

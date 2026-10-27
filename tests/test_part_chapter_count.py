@@ -2,7 +2,7 @@
 
 import pytest
 
-from book_to_skill.utils import detect_structure
+from atom.utils import detect_structure
 
 
 @pytest.mark.parametrize("marker", ["#", "="])

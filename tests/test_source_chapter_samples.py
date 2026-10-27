@@ -11,7 +11,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill import utils
+from atom import utils
 
 
 def _numbered_book(title):

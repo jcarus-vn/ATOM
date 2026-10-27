@@ -15,7 +15,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from book_to_skill.utils import resolve_input_files  # noqa: E402
+from atom.utils import resolve_input_files  # noqa: E402
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ def test_unresolvable_tilde_user_is_left_alone(tmp_path, monkeypatch):
     """"~nosuchuser/..." has no expansion; it must stay reportable, not crash."""
     monkeypatch.chdir(tmp_path)
 
-    result = resolve_input_files(["~nosuchuser-book-to-skill/book.md"])
+    result = resolve_input_files(["~nosuchuser-atom/book.md"])
 
     assert len(result) == 1
     assert result[0].name == "book.md"

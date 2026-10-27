@@ -158,10 +158,10 @@ def test_opencode_extractor_probe_discovers_supported_layouts(tmp_path, layout):
     nested.mkdir(parents=True)
 
     roots = {
-        "personal-native": home / ".config" / "opencode" / "skills" / "book-to-skill",
-        "personal-agents": home / ".agents" / "skills" / "book-to-skill",
-        "personal-claude": home / ".claude" / "skills" / "book-to-skill",
-        "project-opencode": project / ".opencode" / "skills" / "book-to-skill",
+        "personal-native": home / ".config" / "opencode" / "skills" / "atom",
+        "personal-agents": home / ".agents" / "skills" / "atom",
+        "personal-claude": home / ".claude" / "skills" / "atom",
+        "project-opencode": project / ".opencode" / "skills" / "atom",
     }
     extractor = roots[layout] / "scripts" / "extract.py"
     _touch(extractor)
@@ -191,7 +191,7 @@ def test_opencode_project_probe_resolves_project_root_from_nested_cwd(
     nested.mkdir(parents=True)
 
     project_local = (
-        project / project_skill_dir / "skills" / "book-to-skill" / "scripts" / "extract.py"
+        project / project_skill_dir / "skills" / "atom" / "scripts" / "extract.py"
     )
     _touch(project_local)
 
@@ -205,7 +205,7 @@ def test_opencode_project_extractor_is_discoverable(tmp_path, project_skill_dir)
     project = _git_project(tmp_path)
 
     project_local = (
-        project / project_skill_dir / "skills" / "book-to-skill" / "scripts" / "extract.py"
+        project / project_skill_dir / "skills" / "atom" / "scripts" / "extract.py"
     )
     _touch(project_local)
 
@@ -224,8 +224,8 @@ def test_opencode_personal_root_is_reachable_beside_compatibility_roots(tmp_path
     home = tmp_path / "home"
     project = _git_project(tmp_path)
 
-    native = home / ".config" / "opencode" / "skills" / "book-to-skill" / "scripts" / "extract.py"
-    compat = home / ".claude" / "skills" / "book-to-skill" / "scripts" / "extract.py"
+    native = home / ".config" / "opencode" / "skills" / "atom" / "scripts" / "extract.py"
+    compat = home / ".claude" / "skills" / "atom" / "scripts" / "extract.py"
     _touch(native)
     _touch(compat)
 
@@ -248,7 +248,7 @@ def test_opencode_does_not_execute_hermes_only_project_layout(tmp_path):
     home.mkdir(parents=True)
     project = _git_project(tmp_path)
 
-    _touch(project / ".hermes" / "skills" / "book-to-skill" / "scripts" / "extract.py")
+    _touch(project / ".hermes" / "skills" / "atom" / "scripts" / "extract.py")
 
     assert _run_probe(project, _env(tmp_path, home)) == ""
 
@@ -259,8 +259,8 @@ def test_opencode_ignores_foreign_project_roots(tmp_path):
     home.mkdir(parents=True)
     project = _git_project(tmp_path)
 
-    _touch(project / ".hermes" / "skills" / "book-to-skill" / "scripts" / "extract.py")
-    _touch(project / ".github" / "skills" / "book-to-skill" / "scripts" / "extract.py")
+    _touch(project / ".hermes" / "skills" / "atom" / "scripts" / "extract.py")
+    _touch(project / ".github" / "skills" / "atom" / "scripts" / "extract.py")
 
     # `.github/skills` is shared and legitimately discoverable, so assert the
     # Hermes root specifically is not what gets selected.

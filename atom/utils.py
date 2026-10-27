@@ -14,9 +14,9 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from book_to_skill.exceptions import ExtractionError
+from atom.exceptions import ExtractionError
 
-from book_to_skill.config import (
+from atom.config import (
     OUTPUT_DIR,
     OUTPUT_TEXT,
     OUTPUT_META,
@@ -28,17 +28,17 @@ from book_to_skill.config import (
     CALIBRE_EBOOK_EXTENSIONS,
     supported_formats_message,
 )
-from book_to_skill.dependencies import (
+from atom.dependencies import (
     normalize_install_mode,
     prepare_dependencies,
     run_dependency_check,
 )
-from book_to_skill.parsers.text import read_text_file
-from book_to_skill.parsers.html import extract_html_file
-from book_to_skill.parsers.docx import extract_docx
-from book_to_skill.parsers.rtf import extract_rtf
-from book_to_skill.parsers.calibre import extract_with_ebook_convert
-from book_to_skill.parsers.pdf import (
+from atom.parsers.text import read_text_file
+from atom.parsers.html import extract_html_file
+from atom.parsers.docx import extract_docx
+from atom.parsers.rtf import extract_rtf
+from atom.parsers.calibre import extract_with_ebook_convert
+from atom.parsers.pdf import (
     extract_with_docling,
     extract_with_pdftotext,
     extract_with_pypdf,
@@ -46,16 +46,16 @@ from book_to_skill.parsers.pdf import (
     looks_image_only,
     count_pages,
 )
-from book_to_skill.parsers.epub import (
+from atom.parsers.epub import (
     extract_with_ebooklib,
     extract_with_zipfile,
     count_epub_chapters,
     count_epub_images,
 )
-from book_to_skill.sanitize import sanitize_extracted_text
-from book_to_skill.chapter_detection import detect_chapters
-from book_to_skill import ocr as ocr_module
-from book_to_skill.web_input import (
+from atom.sanitize import sanitize_extracted_text
+from atom.chapter_detection import detect_chapters
+from atom import ocr as ocr_module
+from atom.web_input import (
     fetch_web_source,
     is_url,
     read_urls_file,
@@ -963,7 +963,7 @@ def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
     while a heading on its own line still is. (Issue #237)
 
     `chapter_mode` selects the flexible detector in
-    `book_to_skill.chapter_detection` (auto/explicit/toc/heuristic) whose
+    `atom.chapter_detection` (auto/explicit/toc/heuristic) whose
     per-chapter detail is attached as `chapter_details`. When the legacy
     count finds fewer than two chapters but the flexible detector finds at
     least two, the flexible count wins and `chapters_method` becomes
@@ -1038,7 +1038,7 @@ def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
     # Look for ToC indicators in the first ~30k chars (multilingual; see _TOC_PATTERN)
     has_toc = bool(_TOC_PATTERN.search(text[:30000]))
 
-    # Flexible chapter detail (see book_to_skill.chapter_detection). The
+    # Flexible chapter detail (see atom.chapter_detection). The
     # legacy count above stays authoritative except when it finds fewer
     # than two chapters and the flexible detector finds at least two: the
     # legacy detector cannot see bare-title or ToC-anchored chapters.
@@ -1654,39 +1654,32 @@ def print_intro() -> None:
     """Two lines of attribution at the start of every run.
 
     Printed here rather than only in SKILL.md so it shows however the agent
-    invokes extraction. States who maintains the project without asking for
-    anything — the ask belongs at the end, after the work is delivered.
+    invokes extraction. States the project and its licence, nothing more.
     """
     sys.stderr.write(
-        "book-to-skill · turns a document into a structured agent skill\n"
+        "atom · turns a document into a structured agent skill\n"
         "free and MIT-licensed · maintained in personal time · "
-        "github.com/virgiliojr94/book-to-skill\n\n"
+        "github.com/jcarus-vn/ATOM\n\n"
     )
 
 
 def print_support_note() -> None:
-    """One closing line about funding, printed only after a successful run.
+    """One closing line, printed only after a successful run.
 
     Deliberately at the end and deliberately conditional: the reader has just
-    received something that worked, and the sentence says what the money is
-    for rather than asking for it. Never printed when extraction failed —
-    nobody should be asked to fund what just wasted their time.
+    received something that worked. Never printed when extraction failed.
 
     Written to stdout, with the rest of the closing report: stderr is
     unbuffered and stdout is not when the run is piped (which is how an agent
     captures it), so mixing the two puts the closing line at the top.
     """
-    print(
-        "\n   book-to-skill is free, and maintained in personal time."
-        "\n   If it saves you work, you can fund its upkeep: "
-        "github.com/sponsors/virgiliojr94"
-    )
+    print("\n   atom is free and MIT-licensed.")
 
 
 def print_usage() -> None:
     """Print standalone CLI usage."""
     print(
-        "Usage: book-to-skill <path-to-document-folder-or-glob>... "
+        "Usage: atom <path-to-document-folder-or-glob>... "
         "[--mode technical|text] [--install-missing ask|yes|no] "
         "[--chapter-mode auto|explicit|toc|heuristic] "
         "[--ocr auto|off|force] [--ocr-figures on|off] "
@@ -1694,7 +1687,7 @@ def print_usage() -> None:
         file=sys.stderr,
     )
     print(
-        "       book-to-skill --check    # report which extractors are installed",
+        "       atom --check    # report which extractors are installed",
         file=sys.stderr,
     )
     print(f"Supported formats: {supported_formats_message()}", file=sys.stderr)

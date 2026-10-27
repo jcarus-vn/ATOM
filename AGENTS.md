@@ -4,9 +4,9 @@ This file is the repository-wide execution contract for coding agents.
 
 ## Project intent
 
-`book-to-skill` converts books and documents into structured, on-demand Agent Skills. The repository has two distinct halves:
+`ATOM` converts books and documents into structured, on-demand Agent Skills. The repository has two distinct halves:
 
-1. a deterministic Python extractor (`scripts/extract.py` -> `book_to_skill/`), and
+1. a deterministic Python extractor (`scripts/extract.py` -> `atom/`), and
 2. a spec-driven generator (`SKILL.md`) executed by an agent.
 
 Do not blur those responsibilities without a measured reason.

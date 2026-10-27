@@ -51,7 +51,7 @@ jobs:
           {
             printf -- '---\n'
             printf -- 'description: "Convert a book, PDF, EPUB or DOCX into an agent skill for Claude Code, GitHub Copilot CLI and Amp. Install, run, and cut token cost 24x-51x."\n'
-            printf -- 'seo_title: "book-to-skill Guide - Convert Any Book Into an Agent Skill"\n'
+            printf -- 'seo_title: "ATOM Guide - Turn Books and Docs Into an Atomic Brain"\n'
             printf -- '---\n\n'
             # `width="100%"` is what GitHub wants, but it is not a valid HTML
             # width, so browsers discard it and reserve no space for the banner —
@@ -62,7 +62,7 @@ jobs:
           } > docs/guide.md
           # SKILL.md's `description` is written for host agents (~400 chars); as a
           # meta description it just gets truncated mid-sentence in the SERP.
-          sed '0,/^description:/s|^description:.*|description: "The full book-to-skill spec: every step, depth budget, extraction mode, and quality rule the agent follows to turn a document into a skill."\nseo_title: "Skill Reference - The Complete book-to-skill Spec"|' \
+          sed '0,/^description:/s|^description:.*|description: "The full ATOM converter spec: every step, depth budget, extraction mode, and quality rule the agent follows to turn a document into a skill."\nseo_title: "Skill Reference - The Complete ATOM Converter Spec"|' \
             SKILL.md > docs/skill-reference.md
           cp BACKERS.md docs/BACKERS.md
           # Mirror image: the docs pages link back with `../README.md`, correct on
