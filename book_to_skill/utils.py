@@ -52,6 +52,14 @@ from book_to_skill.parsers.epub import (
     count_epub_images,
 )
 from book_to_skill.sanitize import sanitize_extracted_text
+from book_to_skill.chapter_detection import detect_chapters
+from book_to_skill import ocr as ocr_module
+from book_to_skill.web_input import (
+    fetch_web_source,
+    is_url,
+    read_urls_file,
+    WebFetchError,
+)
 
 
 # Covers and decorative assets are common in prose EPUBs, so only surface the
@@ -902,7 +910,7 @@ def _chapter_number(line: str, prev_line: str | None = None) -> int | None:
     return None
 
 
-def detect_structure(text: str) -> dict:
+def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
     """Detect chapter count and table of contents presence.
 
     Scans the whole text (not just the head) and counts DISTINCT chapter numbers
@@ -917,6 +925,14 @@ def detect_structure(text: str) -> dict:
     tail is judged against the line above it so a wrapped cross-reference
     ("...as we cover in / Chapter 6. Closures create types...") is not counted
     while a heading on its own line still is. (Issue #237)
+
+    `chapter_mode` selects the flexible detector in
+    `book_to_skill.chapter_detection` (auto/explicit/toc/heuristic) whose
+    per-chapter detail is attached as `chapter_details`. When the legacy
+    count finds fewer than two chapters but the flexible detector finds at
+    least two, the flexible count wins and `chapters_method` becomes
+    "flexible" - that is exactly the Moby-Dick / Pro Git case the legacy
+    detector under-counted.
     """
     lines = text.splitlines()
     fenced = _closed_fence_line_numbers(lines)
@@ -986,19 +1002,45 @@ def detect_structure(text: str) -> dict:
     # Look for ToC indicators in the first ~30k chars (multilingual; see _TOC_PATTERN)
     has_toc = bool(_TOC_PATTERN.search(text[:30000]))
 
+    # Flexible chapter detail (see book_to_skill.chapter_detection). The
+    # legacy count above stays authoritative except when it finds fewer
+    # than two chapters and the flexible detector finds at least two: the
+    # legacy detector cannot see bare-title or ToC-anchored chapters.
+    try:
+        detail = detect_chapters(text, chapter_mode)
+    except ValueError:
+        detail = detect_chapters(text, "auto")
+    if detail["chapters_count"] >= 2 and chapters_detected < 2:
+        chapters_detected = detail["chapters_count"]
+        chapters_method = "flexible"
+        chapter_headings_sample = [c["title"] for c in detail["chapters"][:10]]
+
     return {
         "chapters_detected": chapters_detected,
         "chapters_method": chapters_method,
         "chapter_headings_sample": chapter_headings_sample,
         "has_toc": has_toc,
+        "chapter_details": detail["chapters"],
+        "chapter_detection": {
+            "mode": chapter_mode,
+            "method": detail["method"],
+            "strategies_used": detail["strategies_used"],
+            "fallback": detail["fallback"],
+        },
     }
 
 
 def parse_arguments(argv: list[str]) -> tuple[list[str], str, str]:
-    """Parse argv into (input_paths, extraction_mode, install_mode)."""
+    """Parse argv into (input_paths, extraction_mode, install_mode).
+
+    New flags (--chapter-mode, --ocr, --ocr-figures) are consumed here so
+    they do not trigger the unknown-flag warning; their values are read by
+    `parse_extended_options`. The 3-tuple return shape is kept for existing
+    callers.
+    """
     input_paths = []
     extraction_mode = "text"
-    
+
     args = argv[1:]
     i = 0
     while i < len(args):
@@ -1006,6 +1048,13 @@ def parse_arguments(argv: list[str]) -> tuple[list[str], str, str]:
         if arg == "--mode":
             if i + 1 < len(args):
                 extraction_mode = args[i+1].lower()
+                i += 2
+            else:
+                i += 1
+        elif arg in ("--chapter-mode", "--ocr"):
+            i += 2 if i + 1 < len(args) else 1
+        elif arg == "--ocr-figures":
+            if i + 1 < len(args) and not args[i+1].startswith("--"):
                 i += 2
             else:
                 i += 1
@@ -1022,12 +1071,69 @@ def parse_arguments(argv: list[str]) -> tuple[list[str], str, str]:
         else:
             input_paths.append(arg)
             i += 1
-            
+
     install_mode = normalize_install_mode(argv)
     if extraction_mode not in ("technical", "text"):
         extraction_mode = "text"
-        
+
     return input_paths, extraction_mode, install_mode
+
+
+def parse_extended_options(argv: list[str]) -> dict:
+    """Read the flexible-chapter and OCR options from argv.
+
+    chapter_mode: auto (default) | explicit | toc | heuristic.
+    ocr_mode: auto (default: OCR scanned pages and figures) | off | force.
+    ocr_figures: True unless "--ocr-figures off" is given.
+    """
+    chapter_mode = "auto"
+    ocr_mode = "auto"
+    ocr_figures = True
+    args = argv[1:]
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--chapter-mode" and i + 1 < len(args):
+            if args[i+1].lower() in ("auto", "explicit", "toc", "heuristic"):
+                chapter_mode = args[i+1].lower()
+            i += 2
+        elif arg == "--ocr" and i + 1 < len(args):
+            if args[i+1].lower() in ("auto", "off", "force"):
+                ocr_mode = args[i+1].lower()
+            i += 2
+        elif arg == "--ocr-figures":
+            if i + 1 < len(args) and not args[i+1].startswith("--"):
+                ocr_figures = args[i+1].lower() not in ("off", "no", "false", "0")
+                i += 2
+            else:
+                ocr_figures = True
+                i += 1
+        else:
+            i += 1
+    return {"chapter_mode": chapter_mode, "ocr_mode": ocr_mode,
+            "ocr_figures": ocr_figures}
+
+
+def split_web_inputs(paths: list[str]) -> tuple[list[str], list[str]]:
+    """Split raw input paths into (file paths, web URLs).
+
+    A bare http(s) URL is a web source. A file ending in .urls is a list of
+    URLs, one per line. Everything else stays a file path.
+    """
+    file_paths: list[str] = []
+    urls: list[str] = []
+    for path in paths:
+        if is_url(path):
+            urls.append(path)
+        elif path.endswith(".urls"):
+            try:
+                urls.extend(read_urls_file(path))
+            except OSError as exc:
+                print(f"WARNING: Could not read URL list {path}: {exc}",
+                      file=sys.stderr)
+        else:
+            file_paths.append(path)
+    return file_paths, urls
 
 
 def resolve_input_files(paths: list[str]) -> list[Path]:
@@ -1173,8 +1279,16 @@ def reuse_is_safe(current_inputs, metadata, current_mode):
     return True, "workdir intact and all sources match the current inputs"
 
 
-def extract_single_file(input_path: Path, extraction_mode: str, install_mode: str) -> dict:
-    """Extract text and metadata from a single file path."""
+def extract_single_file(input_path: Path, extraction_mode: str, install_mode: str,
+                        chapter_mode: str = "auto", ocr_mode: str = "auto",
+                        ocr_figures: bool = True) -> dict:
+    """Extract text and metadata from a single file path.
+
+    chapter_mode selects the flexible chapter detector (auto by default).
+    ocr_mode: "auto" OCRs scanned PDFs and embedded figures, "off" keeps
+    the historical behaviour (scanned PDFs fail, figures are dropped),
+    "force" OCRs every PDF page regardless of native text.
+    """
     input_str = str(input_path)
 
     if not input_path.exists():
@@ -1238,6 +1352,9 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
     pages = 0
     pages_label = "sections"
     images_dropped = None
+    ocr_pages = 0
+    figures_info = {"figures_extracted": 0, "figures_with_ocr": 0,
+                    "vision_used": False, "vision_configured": False}
     
     if ext == ".epub":
         print(f"Extracting EPUB: {input_str}")
@@ -1269,14 +1386,38 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
             )
     elif ext == ".pdf":
         print(f"Extracting PDF: {input_str}")
-        if looks_image_only(input_str):
+        scanned = looks_image_only(input_str)
+        if scanned and ocr_mode == "off":
             raise ExtractionError(
                 f"{input_path.name} looks like a scanned (image-only) PDF: its first pages "
                 "contain no extractable text, only images.\n"
                 "Run OCR on it first, then retry:\n"
                 "  ocrmypdf input.pdf output.pdf"
             )
-        if extraction_mode == "technical":
+        if scanned and ocr_mode != "off":
+            # OCR the document instead of failing: ocrmypdf first, then
+            # render + tesseract per page. If neither tool exists, the
+            # historical error below is what the user gets.
+            ocr_text = ocr_module.ocr_pdf_with_ocrmypdf(input_str)
+            if ocr_text and ocr_text.strip():
+                text = ocr_text
+                method = "ocrmypdf"
+                ocr_pages = count_pages(input_str)
+            else:
+                total = count_pages(input_str) or 5
+                pairs = ocr_module.ocr_pdf_pages(input_str, total)
+                if pairs:
+                    text = "\n\f\n".join(t for _page, t in pairs)
+                    method = "tesseract-page-ocr"
+                    ocr_pages = len(pairs)
+            if not text.strip():
+                raise ExtractionError(
+                    f"{input_path.name} looks like a scanned (image-only) PDF and no "
+                    "OCR tool is available to read it.\n"
+                    "Install ocrmypdf or tesseract, then retry:\n"
+                    "  sudo apt install ocrmypdf tesseract-ocr"
+                )
+        if extraction_mode == "technical" and not text:
             print("Mode: technical — using Docling (layout-aware)...")
             try:
                 text = extract_with_docling(input_str)
@@ -1377,6 +1518,25 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
         pages = 0
         pages_label = "sections"
 
+    if ext == ".pdf" and ocr_mode == "force" and not locals().get("scanned"):
+        total = count_pages(input_str) or 0
+        if total:
+            pairs = ocr_module.ocr_pdf_pages(input_str, total)
+            if pairs:
+                text = "\n\f\n".join(t for _page, t in pairs)
+                method = "tesseract-page-ocr-force"
+                ocr_pages = len(pairs)
+                print(f"  [ocr] force-OCR applied to {ocr_pages} page(s)",
+                      file=sys.stderr)
+
+    if ext == ".pdf" and ocr_figures and ocr_mode != "off":
+        blocks, figures_info = ocr_module.process_pdf_figures(input_str)
+        if blocks:
+            text = (text + "\n\n" + blocks) if text else blocks
+            print(f"  [figures] {figures_info['figures_extracted']} figure(s) "
+                  f"extracted, {figures_info['figures_with_ocr']} with OCR text",
+                  file=sys.stderr)
+
     text, removed_invisible = sanitize_extracted_text(text)
     if removed_invisible:
         print(
@@ -1391,7 +1551,7 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
         )
 
     tokens = estimate_tokens(text)
-    structure = detect_structure(text)
+    structure = detect_structure(text, chapter_mode)
     print(
         f"  chapters: {structure['chapters_detected']} "
         f"({structure['chapters_method']})"
@@ -1418,6 +1578,11 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
         "words": len(text.split()),
         "estimated_tokens": tokens,
         "images_dropped": images_dropped,
+        "ocr_mode": ocr_mode,
+        "ocr_pages": ocr_pages,
+        "figures_extracted": figures_info["figures_extracted"],
+        "figures_with_ocr": figures_info["figures_with_ocr"],
+        "vision_used": figures_info["vision_used"],
         "text": text,
         **structure,
     }
@@ -1486,7 +1651,10 @@ def print_usage() -> None:
     """Print standalone CLI usage."""
     print(
         "Usage: book-to-skill <path-to-document-folder-or-glob>... "
-        "[--mode technical|text] [--install-missing ask|yes|no]",
+        "[--mode technical|text] [--install-missing ask|yes|no] "
+        "[--chapter-mode auto|explicit|toc|heuristic] "
+        "[--ocr auto|off|force] [--ocr-figures on|off] "
+        "[<https-url>...] [<file.urls>]",
         file=sys.stderr,
     )
     print(
@@ -1511,34 +1679,85 @@ def main():
         sys.exit(1)
         
     raw_input_paths, extraction_mode, install_mode = parse_arguments(sys.argv)
-    
+    options = parse_extended_options(sys.argv)
+
     if not raw_input_paths:
         print("ERROR: No input document, folder, or glob pattern specified.", file=sys.stderr)
         sys.exit(1)
-        
-    input_files = resolve_input_files(raw_input_paths)
-    
-    if not input_files:
+
+    file_input_paths, web_urls = split_web_inputs(raw_input_paths)
+    input_files = resolve_input_files(file_input_paths)
+
+    if not input_files and not web_urls:
         print(f"ERROR: No supported files found matching: {', '.join(raw_input_paths)}", file=sys.stderr)
         sys.exit(1)
-        
+
     prepare_output_dir(OUTPUT_DIR)
-    
+
     extracted_sources = []
     combined_texts = []
     errors = []
-    
+
     for file_path in input_files:
         try:
-            res = extract_single_file(file_path, extraction_mode, install_mode)
+            res = extract_single_file(file_path, extraction_mode, install_mode,
+                                      chapter_mode=options["chapter_mode"],
+                                      ocr_mode=options["ocr_mode"],
+                                      ocr_figures=options["ocr_figures"])
         except ExtractionError as exc:
             print(f"WARNING: Skipping {file_path.name}: {exc}", file=sys.stderr)
             errors.append((file_path, str(exc)))
             continue
         extracted_sources.append(res)
-        
+
         # Format the text with a clear boundary
         separator = f"\n\n{'=' * 80}\nSOURCE: {res['filename']} (Path: {res['source_file']})\n{'=' * 80}\n\n"
+        combined_texts.append(separator + res["text"])
+
+    # Web sources go through the same pipeline shape: a failed fetch is a
+    # skipped source, never a failed run.
+    for url in web_urls:
+        try:
+            web = fetch_web_source(url)
+        except WebFetchError as exc:
+            print(f"WARNING: Skipping {url}: {exc}", file=sys.stderr)
+            errors.append((Path(url), str(exc)))
+            continue
+        import hashlib
+        web_text, _removed = sanitize_extracted_text(web["text"])
+        web_structure = detect_structure(web_text, options["chapter_mode"])
+        title = web["title"] or url
+        res = {
+            "source_file": url,
+            "filename": title,
+            "format": "web",
+            "extraction_method": web["method"],
+            "fallback_reason": None,
+            "file_size_mb": round(len(web_text.encode("utf-8")) / (1024 * 1024), 2),
+            "sha256": hashlib.sha256(web_text.encode("utf-8")).hexdigest(),
+            "pages": 0,
+            "pages_label": "sections",
+            "chars": len(web_text),
+            "words": len(web_text.split()),
+            "estimated_tokens": estimate_tokens(web_text),
+            "images_dropped": None,
+            "ocr_mode": options["ocr_mode"],
+            "ocr_pages": 0,
+            "figures_extracted": 0,
+            "figures_with_ocr": 0,
+            "vision_used": False,
+            "url": url,
+            "title": title,
+            "fetched_at": web["fetched_at"],
+            "text": web_text,
+            **web_structure,
+        }
+        extracted_sources.append(res)
+        separator = (
+            f"\n\n{'=' * 80}\nSOURCE (web): {title} (URL: {url}, "
+            f"fetched {web['fetched_at'][:10]} - web content may have "
+            f"changed since fetch)\n{'=' * 80}\n\n"
+        )
         combined_texts.append(separator + res["text"])
     
     if not extracted_sources:
@@ -1570,7 +1789,7 @@ def main():
     # full_text.txt use rows of "=", which can otherwise become phantom setext
     # headings and make the result depend on the source-path length.
     structure_text = "\n\n".join(src["text"] for src in extracted_sources)
-    consolidated_structure = detect_structure(structure_text)
+    consolidated_structure = detect_structure(structure_text, options["chapter_mode"])
     structural_sources = [
         src for src in extracted_sources
         if src["chapters_method"] == "structural" and src["chapters_detected"] >= 2
@@ -1610,6 +1829,8 @@ def main():
         "format": "mixed" if len(extracted_sources) > 1 else extracted_sources[0]["format"],
         "extraction_method": "multi-method" if len(extracted_sources) > 1 else extracted_sources[0]["extraction_method"],
         "extraction_mode": extraction_mode,
+        "chapter_mode": options["chapter_mode"],
+        "ocr_mode": options["ocr_mode"],
         "file_size_mb": round(total_file_size_mb, 2),
         "pages": total_pages,
         "chars": total_chars,
@@ -1640,6 +1861,16 @@ def main():
                 "chapters_detected": src["chapters_detected"],
                 "chapters_method": src["chapters_method"],
                 "chapter_headings_sample": src["chapter_headings_sample"],
+                "chapter_details": src.get("chapter_details", []),
+                "chapter_detection": src.get("chapter_detection", {}),
+                "ocr_mode": src.get("ocr_mode"),
+                "ocr_pages": src.get("ocr_pages", 0),
+                "figures_extracted": src.get("figures_extracted", 0),
+                "figures_with_ocr": src.get("figures_with_ocr", 0),
+                "vision_used": src.get("vision_used", False),
+                "url": src.get("url"),
+                "title": src.get("title"),
+                "fetched_at": src.get("fetched_at"),
                 "has_toc": src["has_toc"]
             }
             for src in extracted_sources

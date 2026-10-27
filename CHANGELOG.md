@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > messages by [git-cliff](https://github.com/orhun/git-cliff)
 > (`git-cliff --tag vX.Y.Z -o CHANGELOG.md`). Write a good PR title instead — it
 > becomes the changelog entry. See `cliff.toml` and CONTRIBUTING.md.
+>
+> NOTE (fork): the entry under "Unreleased" below was added by hand for this
+> fork against the upstream rule, so the fork's changes are visible without
+> waiting for a release cut.
+
+## [Unreleased]
+
+### Added
+- Flexible chapter detection with scored strategies (explicit, ToC, heuristic, fallback) and --chapter-mode
+- OCR for scanned PDFs and embedded figures, with an opt-in vision-describer hook and --ocr / --ocr-figures
+- Web URL inputs (single URL, URL list, .urls file) with URL, title, and fetched_at in metadata
+- Field master skills: atomic notes as source of truth, merged glossary/patterns, taxonomy, typed graph, facets, central registry, cross-field links, incremental fold-in
 
 ## [1.4.0] - 2026-08-10
 

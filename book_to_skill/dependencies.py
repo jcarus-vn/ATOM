@@ -65,6 +65,18 @@ DEPENDENCY_GROUPS = [
         "note": "falls back to a basic regex cleanup if missing",
     },
     {
+        "label": "OCR / figures (optional)",
+        "modules": ["fitz"],
+        "any_of_modules": True,
+        "any_tool_suffices": True,
+        "system": [
+            ("ocrmypdf", "ocrmypdf", "sudo apt install ocrmypdf"),
+            ("tesseract", "tesseract", "sudo apt install tesseract-ocr"),
+        ],
+        "note": "optional; OCR runs only when a tool is present, otherwise "
+                "scanned PDFs fail as before and figures are skipped",
+    },
+    {
         "label": "MOBI / AZW / AZW3",
         "modules": [],
         "any_of_modules": True,

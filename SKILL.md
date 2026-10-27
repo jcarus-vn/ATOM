@@ -64,6 +64,11 @@ Four paths available. Route based on what the user asks:
 **Action:** Run Step 0 (out-of-scope check), Step 1 (validate inputs), Step 1.5 (identify book type), and Step 2 (extract new files). Then skip to Step 5 (identify/detect existing skill path) and run the **Update / Fold-in Workflow** to merge the new content into the existing skill files.
 **Output:** Updated existing skill with new/revised chapter summaries and merged indexes/glossaries.
 
+### 5. Master skill (many sources, one field)
+**Trigger:** User gives several books and/or web articles from one field and wants one unified skill for the field, not one skill per book.
+**Action:** Build it with `python3 scripts/build_master.py --field "<field>" --skills-json <manifest.json>` (manifest format: docs/master-skill.md) or `--skill-dir` per existing skill. The builder merges sources into atomic notes (`notes/<id>.md`, one concept each, slug ids, no Luhmann numbering), then renders glossary, patterns, taxonomy, relations/graph, and cross-field links as views of those notes. Every claim keeps its source (book + chapter, or web URL + fetch date); multi-source agreement is `consensus`, disagreement is `contested` with every side kept, single-source stays labelled. One field gets one master under `<masters-root>/<field-slug>/`; a shared concept across fields is cross-linked, never merged across fields. Adding a source later re-runs the same command: it folds into the existing notes (no duplicates, hand-edited note bodies survive) and bumps the version in `<masters-root>/index.json`.
+**Output:** Master skill directory + registry entry. A master skill is a consensus synthesis, not a new truth: never present a contested point as settled, and never quote a web source as current without noting its fetch date.
+
 ---
 
 ## Skill Locations
@@ -241,6 +246,8 @@ fi
 
 "$PYTHON_BIN" "$SCRIPT_PATH" $INPUT_PATHS --mode <BOOK_TYPE> --install-missing ask
 ```
+
+Extraction also accepts: `--chapter-mode auto|explicit|toc|heuristic` (flexible chapter detection; `explicit` keeps the legacy behaviour), `--ocr auto|off|force` and `--ocr-figures on|off` (see docs/ocr-figures.md), and web inputs: a bare `https://...` URL, or a `.urls` file with one URL per line (see docs/web-input.md). Web sources record `url`, `title`, and `fetched_at` in `metadata.json`; cite them with URL + fetch date and note the live page may since have changed.
 
 Before extraction, the script checks optional Python packages needed for the detected format. If a better extractor is missing, it prompts the user with the available fallback. Non-interactive sessions default to fallback unless install mode is explicitly `yes`.
 
@@ -461,6 +468,8 @@ If a chapter genuinely has no worked example and resists expansion, let it land 
 For EACH chapter/major section identified in Step 3:
 
 Read the corresponding section of the extracted `full_text.txt` (use character offsets or grep for chapter headings).
+**Chapter boundaries:** `metadata.json` also carries `chapter_details` (title, page, strategy, confidence per chapter) from the flexible detector; prefer it over re-guessing headings, and report its `chapter_detection.method` when the count looks surprising.
+**Figure blocks are first-class knowledge:** extracted text may contain `[FIGURE page N, figure M | ...]` blocks with OCR text from inside the figure and, when configured, a vision description labelled `vision-derived, cần kiểm chứng`. Rules read off a diagram belong in patterns.md/cheatsheet.md with the figure's page cited; a claim that comes only from a vision description stays marked unverified, never stated as fact. A figure whose OCR came back empty keeps its placeholder: do not invent its content.
 
 Create `$SKILLS_HOME/<skill_name>/chapters/ch<NN>-<slug>.md` using the structure below.
 

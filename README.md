@@ -27,6 +27,19 @@
    <a href="https://www.star-history.com/virgiliojr94/book-to-skill"><img src="https://api.star-history.com/badge?repo=virgiliojr94/book-to-skill&type=rank" alt="Star History Rank" /></a>
 </p>
 
+> **ATOM - Atomic Thought Organizing Machine.** This is a standalone
+> project based on the original
+> [virgiliojr94/book-to-skill](https://github.com/virgiliojr94/book-to-skill)
+> (MIT, original author credited in full; the license is unchanged), not a
+> GitHub fork. It keeps the original book-to-skill converter and adds a
+> master-skill system on top: flexible chapter detection (Roman numerals,
+> bare titles, Vietnamese chapter words, ToC anchoring, section fallback -
+> docs/chapter-detection.md), OCR for scanned PDFs and embedded figures
+> with an opt-in vision hook (docs/ocr-figures.md), web URL inputs
+> (docs/web-input.md), and field master skills with atomic notes,
+> taxonomy, typed graph, facets, and a central registry
+> (docs/master-skill.md).
+
 
 
 <p align="center">

@@ -204,12 +204,13 @@ def install_pdf_inspector_hook(utils_module: Any | None = None) -> None:
     if getattr(original, "_book_to_skill_pdf_inspector_hook", False):
         return
 
-    def wrapped(input_path: Path, extraction_mode: str, install_mode: str) -> dict[str, Any]:
+    def wrapped(input_path: Path, extraction_mode: str, install_mode: str,
+                *args, **kwargs) -> dict[str, Any]:
         inspection_key = str(input_path.resolve())
         _INSPECTIONS.pop(inspection_key, None)
 
         if not _looks_like_pdf(input_path):
-            return original(input_path, extraction_mode, install_mode)
+            return original(input_path, extraction_mode, install_mode, *args, **kwargs)
 
         markdown, inspection = inspect_pdf(input_path)
         if inspection is not None:
@@ -226,7 +227,7 @@ def install_pdf_inspector_hook(utils_module: Any | None = None) -> None:
                 "using the existing extraction chain.",
                 file=sys.stderr,
             )
-        return original(input_path, extraction_mode, install_mode)
+        return original(input_path, extraction_mode, install_mode, *args, **kwargs)
 
     wrapped._book_to_skill_pdf_inspector_hook = True  # type: ignore[attr-defined]
     wrapped._book_to_skill_original = original  # type: ignore[attr-defined]

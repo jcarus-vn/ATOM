@@ -46,10 +46,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # is that output is non-empty and expected, not that it lands on a stream.
 ENTRY_POINTS = {
     "scripts/extract.py": "book-to-skill · turns a document into a structured agent skill",
+    "scripts/build_master.py": "usage: build_master.py [-h]",
     "tools/scan_generated_skill.py": "usage: scan_generated_skill.py [-h] path",
     "tools/discovery_tax.py": (
         "usage: discovery_tax.py [-h] --full-text FULL_TEXT [--skill-dir SKILL_DIR]"
     ),
+    "tools/eval_taxonomy_lookup.py": "usage: eval_taxonomy_lookup.py [-h]",
     "book_to_skill/cli.py": "book-to-skill · turns a document into a structured agent skill",
 }
 

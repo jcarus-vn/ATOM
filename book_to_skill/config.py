@@ -54,6 +54,7 @@ PYTHON_DEPENDENCIES = {
     "docx": "python-docx",
     "striprtf": "striprtf",
     "trafilatura": "trafilatura",
+    "fitz": "PyMuPDF",
 }
 
 
