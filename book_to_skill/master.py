@@ -142,9 +142,22 @@ def merge_sources(sources: list[dict]) -> dict:
                 alias_to_canonical[normalize_title(alt)] = canon
 
     def canon_key(title: str) -> str:
-        return alias_to_canonical.get(normalize_title(title), normalize_title(title))
+        normalized = normalize_title(title)
+        return alias_to_canonical.get(normalized, normalized)
 
     notes: dict[tuple[str, str], dict] = {}
+    # Kinds per source key, computed once: the old code rebuilt this set
+    # by scanning every source for every item (items x sources). A note's
+    # kinds are the kinds of ALL sources sharing its source keys, even
+    # ones not processed yet, so when a key first joins a note its whole
+    # precomputed kind set joins with it.
+    kinds_by_key: dict[str, set] = {}
+    for s in sources:
+        skey0 = _source_key(s)
+        if skey0:
+            kinds_by_key.setdefault(skey0, set()).add(s.get("kind"))
+    # Kinds per note, maintained incrementally (see above).
+    note_kinds: dict[tuple[str, str], set] = {}
     order: list[tuple[str, str]] = []
     for src in sources:
         for kind, items, title_key in (
@@ -171,6 +184,7 @@ def merge_sources(sources: list[dict]) -> dict:
                         "source_keys": [],
                         "facets": _facets_for(item, kind, [src]),
                     }
+                    note_kinds[key] = set()
                     order.append(key)
                 note = notes[key]
                 if cite not in note["sources"]:
@@ -178,12 +192,10 @@ def merge_sources(sources: list[dict]) -> dict:
                 skey = _source_key(src)
                 if skey and skey not in note["source_keys"]:
                     note["source_keys"].append(skey)
+                    note_kinds[key] |= kinds_by_key.get(skey, set())
                 if text and text not in note["definitions"]:
                     note["definitions"].append(text)
-                kinds = set()
-                for s in sources:
-                    if _source_key(s) in note["source_keys"]:
-                        kinds.add(s.get("kind"))
+                kinds = note_kinds[key]
                 note["facets"]["source_type"] = (
                     "book" if kinds == {"book"} else
                     "web" if kinds == {"web"} else "mixed")

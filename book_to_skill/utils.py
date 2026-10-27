@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 import glob
 import hashlib
 import json
@@ -104,6 +105,10 @@ def estimate_tokens(text: str) -> int:
     """
     if not text:
         return 0
+    if text.isascii():
+        # No CJK character can hide in pure-ASCII text, so the CJK pass
+        # below would find nothing; skip it and count words directly.
+        return int(len(text.split()) / WORDS_PER_TOKEN)
     cjk = len(_CJK_RE.findall(text))
     if not cjk:
         return int(len(text.split()) / WORDS_PER_TOKEN)
@@ -153,6 +158,9 @@ _ROMAN_HEAD = re.compile(r"^\s*([IVXLCDM]+)\s*[:.]\s+[A-ZÀ-Þ0-9\"“(]")
 _LC_MD_ROMAN = re.compile(r"^\s*#{1,6}\s+([ivxlcdm]+)\s*[:.]\s+[A-Za-zÀ-Þ\"“(]")
 _ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
 
+# Plain numbered heading ("1  Introduction"): at least two spaces after the
+# number, so ordinary numbered list items ("1. Item") do not match.
+_PLAIN_NUMBERED_HEAD = re.compile(r"^([1-9]\d{0,2})\s{2,}(\S)")
 # Optional Markdown / AsciiDoc heading prefix ("## Chapter 1", "== Section").
 # Stripped in _chapter_number() as a second pass so the CJK/Thai/Korean
 # matchers (which already tolerate the prefix inline) are untouched. (Issue #91)
@@ -592,15 +600,22 @@ def _numbered_titles_are_structural(
     if len(entries) < _MIN_NUMBERED_TITLES:
         return False
     ordered = sorted(heading_lines)
+    # Prefix sums of line lengths, so each section's body size is O(1):
+    # body(lines[index+1:end]) == prefix[end] - prefix[index+1]. The old
+    # code re-scanned the heading list and re-summed the body per entry.
+    prefix = [0] * (len(lines) + 1)
+    for i, ln in enumerate(lines):
+        prefix[i + 1] = prefix[i] + len(ln)
     bodies = []
     for _, index, _ in entries:
-        after = [ln for ln in ordered if ln > index]
-        end = after[0] if after else len(lines)
-        bodies.append(sum(len(ln) for ln in lines[index + 1:end]))
+        j = bisect.bisect_right(ordered, index)
+        end = ordered[j] if j < len(ordered) else len(lines)
+        bodies.append(prefix[end] - prefix[index + 1])
     return statistics.median(bodies) >= _MIN_NUMBERED_BODY_CHARS
 
 
-def _structural_chapter_headings(text: str) -> list[str]:
+def _structural_chapter_headings(text: str, lines: list[str] | None = None,
+                                 fenced: set[int] | None = None) -> list[str]:
     """Return chapter-like structural headings in Markdown/AsciiDoc/RST sources.
 
     Recognizes ATX headings ("# Title", "== Section") and setext/RST underline
@@ -616,7 +631,12 @@ def _structural_chapter_headings(text: str) -> list[str]:
     the underline (so thematic breaks, table borders, and front-matter "---" do
     not match).
     """
-    lines = text.splitlines()
+    # Callers that already split the text (detect_structure) pass their
+    # lines/fence set in so a large book is not re-split and re-scanned
+    # for fences on every structural pass; defaults preserve the old
+    # standalone behaviour exactly.
+    if lines is None:
+        lines = text.splitlines()
     # Map normalized titles to their original representation. Dict insertion
     # order makes the returned sample match the source order while preserving
     # the previous case-insensitive de-duplication behavior.
@@ -626,7 +646,8 @@ def _structural_chapter_headings(text: str) -> list[str]:
     # are the same string shape, so the line alone cannot decide.
     numbered: dict[int, list[tuple[str, int, str]]] = {}
     heading_lines: list[int] = []
-    fenced = _closed_fence_line_numbers(lines)
+    if fenced is None:
+        fenced = _closed_fence_line_numbers(lines)
     prev = ""  # previous non-fence line (stripped); a setext title candidate
     for index, line in enumerate(lines):
         if index in fenced:
@@ -773,10 +794,18 @@ def _match_chapter_number(
     """
     # Normalize Kangxi-radical numerals (⼀⼆⼋⼗) to ideographs so Chinese
     # ebooks that encode chapter numbers in the U+2F00 block are detected.
-    s = line.strip().translate(_KANGXI_NUMERAL_TRANS)
-
+    # The translation table maps single non-ASCII code points to single
+    # non-ASCII ideographs, so it is the identity on ASCII lines and never
+    # changes a line's length: skip it (and the length check's original
+    # position after it) for the common ASCII case. Every matcher in the
+    # script chain below anchors on a non-ASCII literal, so none of them can
+    # match a pure-ASCII line either; the early return skips ~20 failed
+    # regex attempts per prose line without changing any result.
+    s = line.strip()
     if len(s) > 80:
         return None
+    if not s.isascii():
+        s = s.translate(_KANGXI_NUMERAL_TRANS)
 
     # Plain numbered chapter headings used by many technical books,
     # e.g. "1  Introduction" or "12  Advanced Topics".
@@ -789,7 +818,7 @@ def _match_chapter_number(
     # Its first non-space character is the diff marker, which no chapter title
     # starts with, so the marker decides. Fenced blocks are skipped by the
     # caller; this covers code that arrives without fences. (Issue #237)
-    plain = re.match(r"^([1-9]\d{0,2})\s{2,}(\S)", s)
+    plain = _PLAIN_NUMBERED_HEAD.match(s)
     if plain and plain.group(2) not in "+-":
         return int(plain.group(1))
 
@@ -804,6 +833,13 @@ def _match_chapter_number(
     rm = _ROMAN_HEAD.match(s) or _LC_MD_ROMAN.match(s)
     if rm:
         return _roman_to_int(rm.group(1))
+
+    # Script matchers below all anchor on non-ASCII literals (Chinese,
+    # Thai, Indic, Cyrillic, Greek, Korean, Persian chapter words), so a
+    # pure-ASCII line cannot match any of them. See the note at the top
+    # of this function.
+    if s.isascii():
+        return None
 
     cm = _CN_CHAPTER.match(s) or _MD_CN_HEADING.match(s)
     if cm:
@@ -979,7 +1015,7 @@ def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
         # reproduced in the book, or a lone "Part 1") is not enough to suppress
         # the structural (Markdown/AsciiDoc) heading count, so course-style
         # books with "### Unit N" headings still get counted via max().
-        structural_headings = _structural_chapter_headings(text)
+        structural_headings = _structural_chapter_headings(text, lines, fenced)
         structural_count = len(structural_headings)
         # Parts group chapters and must not win the numeric branch ahead of
         # the structural chapters inside them. Retain the old Part-only

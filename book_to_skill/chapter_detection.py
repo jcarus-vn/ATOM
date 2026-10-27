@@ -58,6 +58,9 @@ class Chapter:
 
 
 _ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+_ROMAN_TABLE = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"),
+                (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
+                (5, "V"), (4, "IV"), (1, "I")]
 
 
 def roman_to_int(text: str) -> int | None:
@@ -72,12 +75,9 @@ def roman_to_int(text: str) -> int | None:
         prev = max(prev, value)
     if total == 0 or total > 200:
         return None
-    table = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"),
-             (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
-             (5, "V"), (4, "IV"), (1, "I")]
     out = []
     n = total
-    for val, sym in table:
+    for val, sym in _ROMAN_TABLE:
         while n >= val:
             out.append(sym)
             n -= val
@@ -127,9 +127,14 @@ _MIN_BARE_BODY_CHARS = 300
 
 
 def _norm(title: str) -> str:
-    title = re.sub(r"^#{1,6}\s+|^={1,6}\s+", "", title.strip())
-    title = re.sub(r"\s+", " ", title).strip().lower()
-    return title.strip(" .:-\u2013\u2014")
+    s = title.strip()
+    # The heading-marker strip only applies when the line starts with a
+    # marker character; most body lines do not, so skip the regex there.
+    # " ".join(split()) collapses whitespace runs exactly like the old
+    # re.sub(r"\s+", " ", ...) after the strip, but runs in C.
+    if s[:1] in "#=":
+        s = re.sub(r"^#{1,6}\s+|^={1,6}\s+", "", s)
+    return " ".join(s.split()).lower().strip(" .:-\u2013\u2014")
 
 
 def _pages(text: str) -> list[tuple[int, list[str]]]:
@@ -212,15 +217,21 @@ def _toc_chapters(rows: list[tuple[int, int, str]]) -> list[Chapter]:
     if len(entries) < 2:
         return []
     # Anchor each entry at its first heading-like body line after the ToC.
+    # Index the body once (normalized line -> first row) instead of
+    # re-scanning the whole body and re-normalizing every line per entry,
+    # which was quadratic in (entries x body lines).
     body = rows[toc_at + 1:]
+    first_body_row: dict[str, tuple[int, int, str]] = {}
+    for row in body:
+        first_body_row.setdefault(_norm(row[2]), row)
     out = []
     for title, toc_page in entries:
-        for page, _idx, line in body:
-            if _norm(line) == title:
-                out.append(Chapter(title=title, number=None, page=page,
-                                   line=len(out), strategy="toc",
-                                   confidence=0.8, strategies=("toc",)))
-                break
+        row = first_body_row.get(title)
+        if row is not None:
+            page = row[0]
+            out.append(Chapter(title=title, number=None, page=page,
+                               line=len(out), strategy="toc",
+                               confidence=0.8, strategies=("toc",)))
         else:
             # Entry never reappears as a heading: keep it, but say so with a
             # lower confidence and the ToC page number, not a body page.

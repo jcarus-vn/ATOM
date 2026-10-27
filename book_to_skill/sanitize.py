@@ -222,6 +222,29 @@ def is_invisible_codepoint(codepoint: int) -> bool:
     return any(low <= codepoint <= high for low, high in _VARIATION_SELECTOR_RANGES)
 
 
+def _invisible_delete_table() -> dict[int, None]:
+    """Deletion table covering exactly what is_invisible_codepoint() matches.
+
+    The per-character loop in sanitize_extracted_text() previously called
+    that predicate once per character in Python; for a multi-MB book that
+    dominated extraction time. str.translate() with a {codepoint: None}
+    table deletes the same set in C, and the removal count is simply the
+    length difference, since every deleted code point is one character.
+    """
+    codepoints = set(_INVISIBLE_CODEPOINTS) | set(_ANNOTATION_CODEPOINTS)
+    for low, high in _VARIATION_SELECTOR_RANGES:
+        codepoints.update(range(low, high + 1))
+    codepoints.update(range(_DEPRECATED_FORMAT_RANGE[0],
+                            _DEPRECATED_FORMAT_RANGE[1] + 1))
+    codepoints.update(range(_TAG_BLOCK_START, _TAG_BLOCK_END + 1))
+    codepoints.update(range(_MUSICAL_FORMAT_RANGE[0],
+                            _MUSICAL_FORMAT_RANGE[1] + 1))
+    return {cp: None for cp in codepoints}
+
+
+_INVISIBLE_DELETE_TABLE = _invisible_delete_table()
+
+
 def sanitize_extracted_text(text: str) -> tuple[str, int]:
     """Remove invisible code points used for document-borne prompt injection.
 
@@ -229,13 +252,6 @@ def sanitize_extracted_text(text: str) -> tuple[str, int]:
     :func:`fold_cjk_radicals`) because they are corrupted characters rather than
     an attack, so they do not count toward the returned removal total.
     """
-    kept: list[str] = []
-    removed = 0
-
-    for character in fold_cjk_radicals(text):
-        if is_invisible_codepoint(ord(character)):
-            removed += 1
-            continue
-        kept.append(character)
-
-    return "".join(kept), removed
+    folded = fold_cjk_radicals(text)
+    cleaned = folded.translate(_INVISIBLE_DELETE_TABLE)
+    return cleaned, len(folded) - len(cleaned)
