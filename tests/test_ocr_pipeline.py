@@ -184,13 +184,13 @@ class TestCacheAndParallel:
         cache = tmp_path / "cache"
         calls = []
 
-        real_ocr = ocr_module.ocr_image_bytes
+        real_ocr = ocr_module.ocr_page_bytes
 
-        def counting(data, lang=None, timeout=120, psm=6):
+        def counting(data, lang=None, timeout=120, psm=None):
             calls.append(1)
             return real_ocr(data, lang=lang, timeout=timeout, psm=psm)
 
-        monkeypatch.setattr(ocr_module, "ocr_image_bytes", counting)
+        monkeypatch.setattr(ocr_module, "ocr_page_bytes", counting)
         first = ocr_module.ocr_pdf_pages(str(pdf), 2, cache_dir=str(cache), jobs=1)
         assert [p for p, _ in first] == [1]
         assert len(calls) == 1

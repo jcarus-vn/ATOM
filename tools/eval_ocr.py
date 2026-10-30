@@ -78,9 +78,10 @@ SENTENCES = [
 TITLE = "Notes on Reliable Systems and Mobile Robots"
 
 
-def _font(size):
+def _font(size, sans=False):
     from PIL import ImageFont
-    for path in FONT_CANDIDATES:
+    candidates = FONT_CANDIDATES[1:] if sans else FONT_CANDIDATES
+    for path in candidates:
         try:
             return ImageFont.truetype(path, size)
         except OSError:
@@ -132,6 +133,40 @@ def _table_page(rows=30):
             draw.text((x, y), cell, font=font, fill=0)
         truth.append(" ".join(row))
         y += 50
+    return img, " ".join(truth)
+
+
+TOC_TITLES = ["Bounded queues", "Retry budgets", "Deadlines", "Caches", "Logs and metrics",
+              "Tracing", "Timeouts", "Load shedding", "Alerts", "Capacity", "Rollouts",
+              "Feature flags", "Localization", "Kalman filters"]
+
+
+def _lines_page(kind):
+    """One column of lines that repeat a leading word: a list or a table of
+    contents. PSM 3 tends to cut these after the repeated word."""
+    from PIL import Image, ImageDraw
+    img = Image.new("L", (PAGE_W, PAGE_H), 255)
+    draw = ImageDraw.Draw(img)
+    font = _font(FONT_PX + 4, sans=kind == "repeat")
+    truth, y = [], 200
+    if kind == "repeat":
+        for i in range(12):
+            line = f"Scanned line number {i} of this test page."
+            draw.text((MARGIN, y), line, font=font, fill=0)
+            truth.append(line)
+            y += 60
+        return img, " ".join(truth)
+    for i, title in enumerate(TOC_TITLES):
+        line = (f"Chapter {i + 1} {title} {7 + 9 * i}" if kind == "toc"
+                else f"Release check number {i + 1} covers {title.lower()} today.")
+        if kind == "toc":
+            draw.text((MARGIN, y), f"Chapter {i + 1}", font=font, fill=0)
+            draw.text((MARGIN + 240, y), title, font=font, fill=0)
+            draw.text((PAGE_W - MARGIN - 80, y), str(7 + 9 * i), font=font, fill=0)
+        else:
+            draw.text((MARGIN, y), line, font=font, fill=0)
+        truth.append(line)
+        y += 60
     return img, " ".join(truth)
 
 
@@ -200,6 +235,9 @@ PAGES = {
     "two-column-offset":    dict(columns=2, offset=LINE_PX // 2),
     "one-column-table":     dict(columns=1, lines_per_col=30, table=True),
     "table-page":           dict(_table=True),
+    "list-page":            dict(_lines="list"),
+    "toc-page":             dict(_lines="toc"),
+    "repeated-start":       dict(_lines="repeat"),
     "one-column-skew-2":    dict(columns=1, lines_per_col=40, _skew=2.0),
     "two-column-skew-1":    dict(columns=2, _skew=1.0),
     "one-column-noisy":     dict(columns=1, lines_per_col=40, _blur=1.2, _noise=0.004),
@@ -212,8 +250,11 @@ def build(name, seed=7):
     skew = spec.pop("_skew", 0.0)
     blur = spec.pop("_blur", 0.0)
     noise = spec.pop("_noise", 0.0)
+    lines = spec.pop("_lines", None)
     if spec.pop("_table", False):
         img, truth = _table_page()
+    elif lines:
+        img, truth = _lines_page(lines)
     else:
         img, truth = _page(seed=seed, **spec)
     img = _degrade(img, skew=skew, blur=blur, noise=noise, seed=seed)

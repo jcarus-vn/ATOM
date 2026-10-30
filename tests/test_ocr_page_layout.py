@@ -1,8 +1,10 @@
-"""Scanned pages: two-column prose and tables both come out in reading order.
+"""Scanned pages: two-column prose, tables and lists all come out in order.
 
-PSM 6 reads a two-column page across both columns; PSM 3 reads a full-page
-table column by column. ``ocr_page_bytes`` uses PSM 3 and falls back to
-PSM 6 for a page that PSM 3 returns as a table cut into columns.
+PSM 6 reads a two-column page across both columns. PSM 3 finds the columns
+but also cuts some one-column pages into side-by-side blocks (a table into
+its columns, lines after a repeated first word). ``ocr_page_bytes`` uses
+PSM 3 and reads again with PSM 6 when its side-by-side blocks are narrow
+or a word-space apart rather than real columns.
 """
 
 import shutil
@@ -17,46 +19,78 @@ sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from atom_brain import ocr  # noqa: E402
 
-PROSE = "\n".join(f"a line of ordinary prose that runs to about eight words {i}"
-                  for i in range(20))
-TABLE_BY_COLUMN = "\n".join([f"Item {i:02d}" for i in range(20)]
-                            + [f"{i}.5" for i in range(20)])
-TABLE_BY_ROW = "\n".join(f"Item {i:02d} {i}.5 3 units ok" for i in range(20))
-POEM = "\n".join(["Short line here", "and another one", "the wind is cold"] * 4)
+HEADER = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext"
 
 
-def _fake(monkeypatch, by_psm):
+def _tsv(*blocks):
+    """TSV with one block per (left, top, width, height), one word each
+    spanning the block's width, word height 30."""
+    rows = [HEADER, "1\t1\t0\t0\t0\t0\t0\t0\t1654\t2339\t-1\t"]
+    for n, (left, top, width, height) in enumerate(blocks, 1):
+        rows.append(f"2\t1\t{n}\t0\t0\t0\t{left}\t{top}\t{width}\t{height}\t-1\t")
+        rows.append(f"5\t1\t{n}\t1\t1\t1\t{left}\t{top}\t{width}\t30\t95\tword")
+    return "\n".join(rows)
+
+
+TWO_COLUMNS = _tsv((150, 150, 640, 1800), (860, 150, 640, 1800))
+ONE_BLOCK = _tsv((150, 150, 1350, 1800))
+TABLE_SPLIT = _tsv((150, 150, 140, 1500), (550, 150, 90, 1500),
+                   (900, 150, 120, 1500), (1250, 150, 80, 1500))
+WORD_SPACE_SPLIT = _tsv((152, 206, 215, 626), (383, 206, 479, 693))
+COLUMNS_WITH_TABLE = _tsv((150, 150, 640, 1800), (860, 150, 640, 1800),
+                          (860, 900, 200, 300), (1100, 900, 200, 300))
+
+
+@pytest.mark.parametrize("tsv, false_columns", [
+    (TWO_COLUMNS, False),
+    (ONE_BLOCK, False),
+    (TABLE_SPLIT, True),
+    (WORD_SPACE_SPLIT, True),
+    (COLUMNS_WITH_TABLE, False),
+])
+def test_false_column_detection(tsv, false_columns):
+    assert ocr._split_into_false_columns(tsv) is false_columns
+
+
+def _fake(monkeypatch, tsv, psm3_text="psm3 text", psm6_text="psm6 text"):
     calls = []
+    monkeypatch.setattr(ocr.shutil, "which", lambda name: "/usr/bin/" + name)
 
-    def fake(data, lang=None, timeout=120, psm=6):
+    def layout(data, lang, timeout, psm):
         calls.append(psm)
-        return by_psm[psm]
+        return psm3_text, tsv
 
-    monkeypatch.setattr(ocr, "ocr_image_bytes", fake)
+    def plain(data, lang=None, timeout=120, psm=6):
+        calls.append(psm)
+        return psm6_text
+
+    monkeypatch.setattr(ocr, "_ocr_with_layout", layout)
+    monkeypatch.setattr(ocr, "ocr_image_bytes", plain)
     return calls
 
 
-def test_two_column_prose_uses_psm3_once(monkeypatch):
-    calls = _fake(monkeypatch, {3: PROSE, 6: "joined across columns"})
-    assert ocr.ocr_page_bytes(b"png") == PROSE
+def test_two_column_page_uses_psm3_once(monkeypatch):
+    calls = _fake(monkeypatch, TWO_COLUMNS)
+    assert ocr.ocr_page_bytes(b"png", lang="eng") == "psm3 text"
     assert calls == [3]
 
 
-def test_table_split_into_columns_is_read_again_by_rows(monkeypatch):
-    calls = _fake(monkeypatch, {3: TABLE_BY_COLUMN, 6: TABLE_BY_ROW})
-    assert ocr.ocr_page_bytes(b"png") == TABLE_BY_ROW
+@pytest.mark.parametrize("tsv", [TABLE_SPLIT, WORD_SPACE_SPLIT])
+def test_false_columns_are_read_again_with_psm6(monkeypatch, tsv):
+    calls = _fake(monkeypatch, tsv)
+    assert ocr.ocr_page_bytes(b"png", lang="eng") == "psm6 text"
     assert calls == [3, 6]
 
 
-def test_short_line_page_keeps_psm3_when_psm6_is_no_better(monkeypatch):
-    calls = _fake(monkeypatch, {3: POEM, 6: POEM})
-    assert ocr.ocr_page_bytes(b"png") == POEM
+def test_psm3_text_kept_when_psm6_reads_nothing(monkeypatch):
+    calls = _fake(monkeypatch, TABLE_SPLIT, psm6_text=None)
+    assert ocr.ocr_page_bytes(b"png", lang="eng") == "psm3 text"
     assert calls == [3, 6]
 
 
 def test_explicit_psm_is_used_as_is(monkeypatch):
-    calls = _fake(monkeypatch, {6: "x", 3: "y"})
-    assert ocr.ocr_page_bytes(b"png", psm=6) == "x"
+    calls = _fake(monkeypatch, TWO_COLUMNS)
+    assert ocr.ocr_page_bytes(b"png", psm=6) == "psm6 text"
     assert calls == [6]
 
 
@@ -81,7 +115,7 @@ needs_tesseract = pytest.mark.skipif(not shutil.which("tesseract"),
 
 @needs_tesseract
 @pytest.mark.parametrize("page", ["two-column", "two-column-offset", "table-page",
-                                  "one-column"])
+                                  "one-column", "repeated-start", "toc-page"])
 def test_real_pages_read_in_order(page):
     pytest.importorskip("PIL")
     import eval_ocr
