@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jcarus-vn.github.io/ATOM/sitemap.xml
