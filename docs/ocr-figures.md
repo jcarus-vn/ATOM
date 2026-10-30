@@ -20,6 +20,31 @@ python3 scripts/extract.py book.pdf --ocr force         # OCR every page
 python3 scripts/extract.py --check                      # shows OCR tool status
 ```
 
+Rendered pages are read with tesseract's automatic layout (PSM 3), so a
+page set in two columns comes out column by column. A page that this
+returns as mostly one- to three-word lines is a table cut into columns,
+and is read again row by row (PSM 6). `tools/eval_ocr.py` measures this
+on synthetic pages with known text (character error rate, lower is
+better; tesseract 5.3.4, English):
+
+| Page | PSM 6 only (before) | Now |
+| --- | ---: | ---: |
+| one column, with or without title | 0.00% | 0.00% |
+| one column, prose with a small table | 0.00% | 0.00% |
+| full-page table | 0.00% | 0.00% |
+| one column, skewed 2° | 0.03% | 0.03% |
+| one column, blurred and noisy | 1.16% | 0.98% |
+| two columns | 68.50% | 0.05% |
+| two columns, title across both | 67.08% | 0.05% |
+| two columns, baselines offset | 71.10% | 0.05% |
+| two columns, skewed 1° | 68.40% | 0.10% |
+| two columns, blurred and noisy | 69.08% | 0.92% |
+
+Reading took 17% longer over the whole set (21.1 s against 18.0 s, one
+run), and about 2.4 times as long on the full-page table, which is read
+twice. The pages are synthetic: real
+scans will score worse on every row.
+
 ## Figures and diagrams
 
 With `--ocr-figures on` (default when OCR is not off), embedded images
