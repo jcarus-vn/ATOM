@@ -16,7 +16,11 @@ many masters, one per field, each isolated from the others.
   by kind. They say so in their header. Editing a note and rebuilding
   updates the views; editing a view directly will be overwritten.
 - **Taxonomy is the navigation index** (`taxonomy.md`): field > area >
-  concept, 3 levels. The original chapter/section structure of each
+  concept, 3 levels, labels and note links only (citations live in the
+  notes). A concept is filed under the area whose name matches its topic
+  facet or source chapter; with no match it is listed as unplaced rather
+  than filed under an arbitrary area. Nodes marked `"manual": true` in
+  `master.json` keep the parents a person gave them on every rebuild. The original chapter/section structure of each
   source stays the ground truth; the taxonomy never rewrites content to
   fit it. A concept may sit under several areas (polyhierarchy), and a
   concept shared with another field is cross-linked in
@@ -122,8 +126,15 @@ repo's test suite):
 
 - Flat scan: 12/12 found, 6.5 notes scanned on average, 364 tokens on
   average.
-- Taxonomy index: 12/12 found, 65 tokens on average (index amortized +
-  one note).
+- Taxonomy index: 12/12 found, 64 tokens on average (index amortized +
+  one note); 158 tokens for the first lookup of a session, before the
+  index is amortized.
+
+The index cost is measured on the rendered `taxonomy.md`, the file an
+agent reads. On the 118-concept Robotics master that is about 1,000
+tokens (labels and note links only); the first lookup of a session costs
+about 1,040 tokens, and a ranked `--question` query plus the notes it
+returns about 660 tokens with nothing amortized.
 
 The index does not find more than the flat scan; it finds the same
 answers while loading less. Re-run the script on your own master before

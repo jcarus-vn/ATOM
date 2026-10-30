@@ -40,7 +40,7 @@
 </p>
 
 <p align="center">
-  <strong>71 tokens to find an answer, not 2,201 - on every question, every turn.</strong> Measured on a real 118-concept master skill: taxonomy lookup vs flat scan, 31x cheaper - with answer quality identical before and after compression. (<a href="docs/performance.md#the-discovery-loop-tax">how it's measured</a>)
+  <strong>About 660 tokens per question, no warm-up needed - instead of re-reading a 266,000-token book.</strong> Measured on a real 118-concept master skill: a ranked query plus the notes it returns, over 22 questions, with answer quality identical before and after compression. (<a href="docs/performance.md#the-discovery-loop-tax">how it's measured</a>)
 </p>
 
 **How it works, in 3 steps:**
@@ -57,8 +57,8 @@ Token cost is the whole business case. The structuring work is paid **once**, at
 
 | Every time you... | Without ATOM | With ATOM |
 |-------------------|--------------|-----------|
-| Route to the right note | 2,201 tokens scanned flat | **71 tokens** via the taxonomy index (31x less) |
-| Answer a question in a session, all-in | Re-read the whole book text: about 266,000 tokens for this corpus, re-billed every turn | **about 1,506 tokens** amortized (index load + top-5 note bodies, measured over 22 questions) |
+| Answer a question, all-in | Re-read the whole book text: about 266,000 tokens for this corpus, re-billed every turn | **about 660 tokens** per question: the ranked query (`--question`) plus the note files it returns, averaged over 22 questions, nothing amortized |
+| Route to the right note by browsing | 2,201 tokens scanning notes flat | **about 1,040 tokens** for the first lookup of a session (the taxonomy index + one note); **44** per lookup once the index stays in context over 118 lookups |
 | Store the master | 88,901 tokens / 702 KB | **34,462 tokens / 171 KB** in compact format (61% fewer tokens, 76% fewer bytes) |
 | Rank candidate notes | 14.4 ms | **1.0 ms** |
 
@@ -121,7 +121,8 @@ If your project re-opens a document often enough to wish the agent had memorized
 
 A PDF-reading agent doesn't just read - it *navigates*: it re-fetches the ToC, backtracks, and re-processes all of it on every turn. ATOM pays that structuring cost **once**, at conversion, so queries stay proportional to the answer. Every number below was measured on this repo, not borrowed:
 
-- **Lookup: 71 tokens vs 2,201** - taxonomy index vs flat scan on a real 118-concept master skill (31x cheaper).
+- **A question: about 660 tokens** - ranked query plus the notes it returns, averaged over 22 questions on a real 118-concept master skill, with no index to warm up. Browsing the taxonomy instead costs about 1,040 tokens for the first lookup of a session.
+- **Counted how:** a words/0.75 estimate. On this master a real BPE tokenizer (cl100k) counts about 1.4x more for the query path (940 tokens) because citations carry URLs; non-English text counts higher still.
 - **Storage: 61% fewer tokens, 76% fewer bytes** with the compact format - and answer quality bit-identical before and after.
 - **Speed: ranking 14.4 ms down to 1.0 ms** per question on the same master.
 - **Quality, checked both ways:** a dev set and a locked holdout set (12 + 10 questions) score the same through the compact path as through the legacy path.
@@ -157,7 +158,7 @@ spec-driven generator (`SKILL.md`) that distills structure, not summaries.
 Extraction runs locally; your files are never uploaded by the tool.
 
 **Why it matters:** a flat pile of notes costs tokens on every question.
-ATOM's taxonomy index routes straight to the right note: 65 tokens vs 364
+ATOM's taxonomy index routes straight to the right note: 64 tokens vs 364
 scanning flat on a measured 12-concept fixture (docs/master-skill.md).
 Cross-checked concepts merge into one note; disagreements stay visible as
 contested, with both sides and sources, instead of being silently picked
@@ -169,7 +170,7 @@ for you.
 
 ▶️ **All modes and examples → [docs/usage.md](docs/usage.md)**
 
-💬 **In practice → [master skills](docs/master-skill.md)** - one field, one master skill: a 12-concept taxonomy lookup costs 65 tokens through the index vs 364 scanning notes flat (measured fixture).
+💬 **In practice → [master skills](docs/master-skill.md)** - one field, one master skill: a 12-concept taxonomy lookup costs 64 tokens through the index vs 364 scanning notes flat (measured fixture).
 
 ---
 

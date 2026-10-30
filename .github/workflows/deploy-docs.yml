@@ -11,6 +11,7 @@ on:
       - BACKERS.md
       - mkdocs.yml
       - .github/workflows/deploy-docs.yml
+      - .github/scripts/assemble-docs.sh
   pull_request:
     paths:
       - docs/**
@@ -20,10 +21,13 @@ on:
       - BACKERS.md
       - mkdocs.yml
       - .github/workflows/deploy-docs.yml
+      - .github/scripts/assemble-docs.sh
 
-# Minimal: gh-deploy pushes the built site to the gh-pages branch.
+# Read-only by default: a pull request (including one from a fork) builds the
+# site with no write token. Only the deploy job, which runs on pushes to
+# master, gets contents: write to push the gh-pages branch.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   docs:
@@ -32,6 +36,8 @@ jobs:
       # Actions pinned to commit SHAs (tags in comments) so a supply-chain
       # swap on a moving tag cannot alter the build. Zizmor-clean.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
@@ -45,31 +51,24 @@ jobs:
         # README links are written repo-relative (`docs/faq.md`, `docs/assets/…`)
         # so they work on GitHub. Once the file lands *inside* docs/ they must
         # drop that prefix, otherwise every one of them 404s on the site.
-        run: |
-          # README.md carries no frontmatter (it has to stay clean on GitHub), so
-          # the Guide page would otherwise inherit the generic site description.
-          {
-            printf -- '---\n'
-            printf -- 'description: "Convert a book, PDF, EPUB or DOCX into an agent skill for Claude Code, GitHub Copilot CLI and Amp. Install, run, and cut token cost 24x-51x."\n'
-            printf -- 'seo_title: "ATOM Guide - Turn Books and Docs Into an Atomic Brain"\n'
-            printf -- '---\n\n'
-            # `width="100%"` is what GitHub wants, but it is not a valid HTML
-            # width, so browsers discard it and reserve no space for the banner —
-            # everything below it jumps once the image loads. Real dimensions let
-            # the browser hold the slot; Material's `height:auto` keeps it fluid.
-            sed -E 's,(href="|src="|\]\()docs/,\1,g' README.md \
-              | sed -E '/banner\.webp/s,width="100%",width="1600" height="686",'
-          } > docs/guide.md
-          # SKILL.md's `description` is written for host agents (~400 chars); as a
-          # meta description it just gets truncated mid-sentence in the SERP.
-          sed '0,/^description:/s|^description:.*|description: "The full ATOM converter spec: every step, depth budget, extraction mode, and quality rule the agent follows to turn a document into a skill."\nseo_title: "Skill Reference - The Complete ATOM Converter Spec"|' \
-            SKILL.md > docs/skill-reference.md
-          cp BACKERS.md docs/BACKERS.md
-          # Mirror image: the docs pages link back with `../README.md`, correct on
-          # GitHub, a 404 on the site — where that same file is published as guide/.
-          sed -i -E 's,\]\(\.\./README\.md\),](guide.md),g' docs/*.md
+        run: bash .github/scripts/assemble-docs.sh
       - name: Build
         run: mkdocs build
-      - name: Deploy to gh-pages (master push only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+  deploy:
+    needs: docs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # mkdocs gh-deploy pushes the gh-pages branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install MkDocs Material
+        run: pip install mkdocs-material mkdocs-redirects
+      - name: Assemble docs sources
+        run: bash .github/scripts/assemble-docs.sh
+      - name: Deploy to gh-pages
         run: mkdocs gh-deploy --force

@@ -42,7 +42,7 @@ from atom.parsers.rtf import extract_rtf
 from atom.parsers.calibre import extract_with_ebook_convert
 from atom.parsers.pdf import (
     extract_with_docling,
-    extract_with_pdftotext,
+    extract_with_pdftotext_detail,
     extract_with_pypdf,
     extract_with_pdfminer,
     looks_image_only,
@@ -1420,6 +1420,7 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
     pages_label = "sections"
     images_dropped = None
     ocr_pages = 0
+    ocr_page_numbers: set = set()
     figures_info = {"figures_extracted": 0, "figures_with_ocr": 0,
                     "vision_used": False, "vision_configured": False}
     
@@ -1470,6 +1471,7 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
                 text = ocr_text
                 method = "ocrmypdf"
                 ocr_pages = count_pages(input_str)
+                ocr_page_numbers.update(range(1, ocr_pages + 1))
             else:
                 total = count_pages(input_str) or 5
                 pairs = ocr_module.ocr_pdf_pages(input_str, total)
@@ -1477,6 +1479,7 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
                     text = "\n\f\n".join(t for _page, t in pairs)
                     method = "tesseract-page-ocr"
                     ocr_pages = len(pairs)
+                    ocr_page_numbers.update(page for page, _t in pairs)
             if not text.strip():
                 raise ExtractionError(
                     f"{input_path.name} looks like a scanned (image-only) PDF and no "
@@ -1516,11 +1519,30 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
         if extraction_mode == "text" or not text:
             print("Mode: text — using pdftotext...")
             print("Trying pdftotext...", end=" ", flush=True)
-            text = extract_with_pdftotext(input_str)
+
+            def _ocr_some(numbers):
+                return dict(ocr_module.ocr_pdf_pages(input_str, 0, pages=numbers))
+
+            text, page_info = extract_with_pdftotext_detail(
+                input_str, _ocr_some if ocr_mode != "off" else None)
 
             if text and text.strip():
                 method = "pdftotext"
                 print("OK")
+                if page_info["column_pages"]:
+                    print(f"  [layout] {len(page_info['column_pages'])} two-column "
+                          "page(s) read column by column", file=sys.stderr)
+                if page_info["ocr_pages"]:
+                    ocr_pages = len(page_info["ocr_pages"])
+                    ocr_page_numbers.update(page_info["ocr_pages"])
+                    print(f"  [ocr] {ocr_pages} scanned page(s) inside the PDF "
+                          "OCRed in place", file=sys.stderr)
+                if page_info["empty_pages"]:
+                    print(f"  [warn] {len(page_info['empty_pages'])} page(s) have no "
+                          "text layer and were not OCRed (pages "
+                          f"{', '.join(map(str, page_info['empty_pages'][:10]))}"
+                          f"{'...' if len(page_info['empty_pages']) > 10 else ''})",
+                          file=sys.stderr)
             else:
                 print("not available")
                 print("Trying pypdf...", end=" ", flush=True)
@@ -1593,11 +1615,13 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
                 text = "\n\f\n".join(t for _page, t in pairs)
                 method = "tesseract-page-ocr-force"
                 ocr_pages = len(pairs)
+                ocr_page_numbers.update(page for page, _t in pairs)
                 print(f"  [ocr] force-OCR applied to {ocr_pages} page(s)",
                       file=sys.stderr)
 
     if ext == ".pdf" and ocr_figures and ocr_mode != "off":
-        blocks, figures_info = ocr_module.process_pdf_figures(input_str)
+        blocks, figures_info = ocr_module.process_pdf_figures(
+            input_str, skip_pages=ocr_page_numbers)
         if blocks:
             text = (text + "\n\n" + blocks) if text else blocks
             skipped = (figures_info.get("figures_repeated_skipped", 0)
@@ -1725,6 +1749,10 @@ def print_usage() -> None:
         "       atom --check    # report which extractors are installed",
         file=sys.stderr,
     )
+    print(
+        "       atom --clear-ocr-cache    # delete cached page renders and OCR text",
+        file=sys.stderr,
+    )
     print(f"Supported formats: {supported_formats_message()}", file=sys.stderr)
 
 
@@ -1737,6 +1765,13 @@ def main():
 
     if "--check" in sys.argv[1:]:
         sys.exit(run_dependency_check())
+
+    if "--clear-ocr-cache" in sys.argv[1:]:
+        cache_dir = ocr_module.default_cache_dir()
+        count, size = ocr_module.clear_cache(cache_dir)
+        print(f"OCR cache {cache_dir or '(disabled)'}: removed {count} file(s), "
+              f"{size / (1024 * 1024):.1f} MB")
+        sys.exit(0)
 
     if len(sys.argv) < 2:
         print_usage()

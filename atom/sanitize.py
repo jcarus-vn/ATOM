@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unicodedata
 
 
@@ -245,13 +246,34 @@ def _invisible_delete_table() -> dict[int, None]:
 _INVISIBLE_DELETE_TABLE = _invisible_delete_table()
 
 
+# 10. Orthographic joiners. In Persian, Arabic, Syriac and the Indic scripts a
+#     single ZERO WIDTH NON-JOINER / JOINER between two letters is spelling,
+#     not padding: Persian "می‌خواهم" needs the ZWNJ, Sinhala "අධ්‍යාය" the ZWJ,
+#     and removing it changes the word (and broke the Persian chapter matcher's
+#     ZWNJ branch). One such character between two letters of those scripts is
+#     kept; anywhere else, and any run of two or more, is still stripped. A
+#     lone joiner carries no payload: hidden text needs a run.
+_JOINING_SCRIPTS = ("\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u0900-\u0DFF"
+                    "\uFB50-\uFDFF\uFE70-\uFEFF")
+_ORTHOGRAPHIC_JOINER = re.compile(
+    f"(?<=[{_JOINING_SCRIPTS}])([\u200C\u200D])(?=[{_JOINING_SCRIPTS}])")
+
+
 def sanitize_extracted_text(text: str) -> tuple[str, int]:
     """Remove invisible code points used for document-borne prompt injection.
 
     Kangxi radicals are folded to their ideographs on the way through (see
     :func:`fold_cjk_radicals`) because they are corrupted characters rather than
-    an attack, so they do not count toward the returned removal total.
+    an attack, so they do not count toward the returned removal total. A
+    single orthographic ZWJ/ZWNJ inside a Persian, Arabic, Syriac or Indic
+    word is kept (group 10 above).
     """
     folded = fold_cjk_radicals(text)
-    cleaned = folded.translate(_INVISIBLE_DELETE_TABLE)
+    if "\u200c" not in folded and "\u200d" not in folded:
+        cleaned = folded.translate(_INVISIBLE_DELETE_TABLE)
+        return cleaned, len(folded) - len(cleaned)
+    # re.split with one capture group: odd items are the kept joiners.
+    parts = _ORTHOGRAPHIC_JOINER.split(folded)
+    cleaned = "".join(part if i % 2 else part.translate(_INVISIBLE_DELETE_TABLE)
+                      for i, part in enumerate(parts))
     return cleaned, len(folded) - len(cleaned)
