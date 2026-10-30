@@ -49,7 +49,9 @@ def test_technical_pdf_records_fallback_reason(
     monkeypatch.setattr(utils, "looks_image_only", lambda *_: False)
     monkeypatch.setattr(utils, "extract_with_docling", lambda *_: docling_result)
     monkeypatch.setattr(
-        utils, "extract_with_pdftotext", lambda *_: "# Technical book\n\nText only."
+        utils, "extract_with_pdftotext_detail",
+        lambda *_a, **_k: ("# Technical book\n\nText only.",
+                           {"column_pages": [], "ocr_pages": [], "empty_pages": []})
     )
     monkeypatch.setattr(utils, "count_pages", lambda *_: 1)
 
@@ -75,7 +77,9 @@ def test_docling_runtime_failure_is_recorded_in_metadata(tmp_path, monkeypatch, 
     monkeypatch.setattr(utils, "looks_image_only", lambda *_: False)
     monkeypatch.setattr(utils, "count_pages", lambda *_: 1)
     monkeypatch.setattr(
-        utils, "extract_with_pdftotext", lambda *_: "# Technical book\n\nText only."
+        utils, "extract_with_pdftotext_detail",
+        lambda *_a, **_k: ("# Technical book\n\nText only.",
+                           {"column_pages": [], "ocr_pages": [], "empty_pages": []})
     )
 
     def fail_docling(_path):

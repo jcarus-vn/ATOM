@@ -50,9 +50,16 @@ def main() -> int:
     else:
         questions = [n["title"] for n in notes]
     taxonomy_nodes = master.get("taxonomy", [])
-    taxonomy_index_tokens = estimate_tokens(
-        "\n".join(f"{n['label']} {' '.join(n.get('sources', []))}"
-                  for n in taxonomy_nodes))
+    # Cost the index the agent actually loads: the rendered taxonomy.md
+    # when it exists, else labels + sources as older masters stored them.
+    taxonomy_md = args.master_dir / "taxonomy.md"
+    if taxonomy_md.exists():
+        taxonomy_index_tokens = estimate_tokens(
+            taxonomy_md.read_text(encoding="utf-8"))
+    else:
+        taxonomy_index_tokens = estimate_tokens(
+            "\n".join(f"{n['label']} {' '.join(n.get('sources', []))}"
+                      for n in taxonomy_nodes))
     flat_hits = taxonomy_hits = 0
     flat_notes = flat_tokens = tax_tokens = 0
     for question in questions:

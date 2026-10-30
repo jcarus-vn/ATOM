@@ -64,11 +64,14 @@ def test_slim_taxonomy_drops_citations_and_links_notes():
     assert "-> notes/kalman-filter.md" in slim
 
 
-def test_slim_taxonomy_costs_less_than_legacy_render():
-    old = render_taxonomy_md("Robotics", _nodes())
+def test_production_taxonomy_render_is_slim_too():
+    # The build's taxonomy.md now links notes instead of repeating every
+    # citation, so it costs about what the slim index does.
+    built = render_taxonomy_md("Robotics", _nodes())
     slim = render_slim_taxonomy("Robotics", _nodes())
-    assert estimate_tokens(slim) < estimate_tokens(old)
-    assert estimate_tokens(slim) <= estimate_tokens(old) // 2
+    assert LONG_CITE not in built and "Sources:" not in built
+    assert "(notes/slam.md)" in built
+    assert estimate_tokens(built) <= 2 * estimate_tokens(slim)
 
 
 def test_duplicate_concepts_grouped_and_canonical_prefers_glossary():

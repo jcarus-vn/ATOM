@@ -54,6 +54,35 @@ generator spec (SKILL.md) treats figure blocks as first-class knowledge
 page cited - but a claim that comes only from a vision description
 stays marked unverified.
 
+## Mixed PDFs, columns and decoration
+
+- **A scanned page inside a digital PDF** (a pasted-in scan, a photographed
+  appendix) is found page by page: a page with no text layer is OCRed and
+  its text goes back at that page's position, not at the end. With
+  `--ocr off` the run lists those pages instead of dropping them silently.
+- **Two-column pages** are detected in pdftotext's layout output and
+  rewritten column by column, so sentences from the two columns are not
+  interleaved on one line. A title spanning both columns stays in place.
+- **Figures that are decoration are skipped before OCR**: an image that
+  repeats on at least 20% of the pages (and 3 pages or more) is a logo or
+  running graphic; an image under 48 px on both sides is an icon; the same
+  image is OCRed once. Pages already OCRed whole are not read again as
+  figures. The run prints how many images it skipped.
+- A figure block still sits at the end of its source's text, tagged with
+  its page number.
+
+## Cache
+
+Page renders, OCR text and vision descriptions are cached under
+`~/.cache/atom-ocr` (or `$ATOM_OCR_CACHE_DIR`), so a re-run over the same
+PDF is fast. The cache holds the text of the documents you converted:
+
+- it is capped at 1 GB, oldest files removed first
+  (`ATOM_OCR_CACHE_MAX_MB` changes the cap);
+- `atom --clear-ocr-cache` (or `scripts/extract.py --clear-ocr-cache`)
+  deletes it;
+- `ATOM_OCR_CACHE_DIR=off` turns it off.
+
 ## Limits
 
 - OCR quality is the tool's quality: tesseract misreads small, skewed,

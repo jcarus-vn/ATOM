@@ -270,6 +270,9 @@ def merge_sources(sources: list[dict]) -> dict:
                         # the moment they are read: a contested note shows
                         # each definition beside the source that gave it.
                         "sides": [],
+                        # Source chapters the concept was read from; used to
+                        # file it under the matching taxonomy area.
+                        "chapters": [],
                         "sources": [],
                         "source_keys": [],
                         "facets": _facets_for(item, kind, [src]),
@@ -277,6 +280,8 @@ def merge_sources(sources: list[dict]) -> dict:
                     note_kinds[key] = set()
                     order.append(key)
                 note = notes[key]
+                if chapter and str(chapter) not in note["chapters"]:
+                    note["chapters"].append(str(chapter))
                 if cite not in note["sources"]:
                     note["sources"].append(cite)
                 skey = _source_key(src)
@@ -427,8 +432,9 @@ def build_taxonomy(notes: list[dict], sources: list[dict],
     Levels: field root is implicit (the master directory itself); nodes
     here are level 2 areas and level 3 concepts. A concept may list several
     parent areas (polyhierarchy). When existing_nodes are given (fold-in),
-    their labels and parents are kept verbatim - only status and sources
-    are refreshed, and new concepts are appended - so hand edits survive.
+    their labels are kept, nodes marked ``"manual": true`` keep their
+    parents, other nodes are re-placed from the current sources, and new
+    concepts are appended.
     """
     nodes: list[dict] = []
     if existing_nodes:
@@ -472,6 +478,7 @@ def build_taxonomy(notes: list[dict], sources: list[dict],
             known_ids.add(area_id)
     for note in notes:
         parents: list[str] = []
+        note_chapters = {normalize_title(c) for c in note.get("chapters", [])}
         for area_name, topics in areas:
             area_id = area_ids.get(normalize_title(area_name))
             if not area_id:
@@ -480,15 +487,20 @@ def build_taxonomy(notes: list[dict], sources: list[dict],
                 parents.append(area_id)
             elif normalize_title(note["facets"].get("topic", "")) == normalize_title(area_name):
                 parents.append(area_id)
-        if not parents and area_ids:
-            parents = [next(iter(area_ids.values()))]
+            elif normalize_title(area_name) in note_chapters:
+                parents.append(area_id)
+        # No matching area: the concept stays unplaced (listed as such in
+        # taxonomy.md) instead of being filed under whichever area came
+        # first, which put 94 of 118 Robotics concepts under "Preface".
         existing = next((nd for nd in nodes if nd["id"] == note["id"]), None)
         if existing is not None:
             existing["status"] = note["status"]
             existing["sources"] = list(note["sources"])
+            # A node placed by hand ("manual": true) keeps its parents; a
+            # builder-placed node is re-placed from the current sources, so
+            # a wrong placement from an older build does not stick forever.
             if parents and not existing.get("manual"):
-                existing["parents"] = list(
-                    dict.fromkeys(existing.get("parents", []) + parents))
+                existing["parents"] = list(dict.fromkeys(parents))
         else:
             nodes.append(concept_node(note, parents))
     for node in nodes:
@@ -1033,9 +1045,14 @@ def render_patterns_md(notes: list[dict]) -> str:
 
 
 def render_taxonomy_md(field: str, nodes: list[dict]) -> str:
-    """Render the taxonomy tree: field > area > concept, with status and
-    source pointers on every node. A concept under several areas appears
-    under each parent (polyhierarchy), annotated as shared."""
+    """Render the taxonomy tree: field > area > concept.
+
+    Navigation only, so it stays small: each concept line carries its
+    status and a link to its note, where the citations live once. (The
+    old render repeated every citation under every area and concept: on
+    the Robotics master that was ~9,900 tokens for 140 nodes.) A concept
+    under several areas appears under each (polyhierarchy), marked shared.
+    """
     children: dict[str, list[dict]] = {}
     for node in nodes:
         for parent in node.get("parents", []):
@@ -1043,24 +1060,24 @@ def render_taxonomy_md(field: str, nodes: list[dict]) -> str:
     areas = [n for n in nodes if n["level"] == 2]
     concepts = {n["id"]: n for n in nodes if n["level"] == 3}
     lines = [f"# Taxonomy - {field}", "",
-             "Navigation index only: the notes in notes/ stay the ground "
-             "truth, this tree never rewrites their content.", ""]
+             "Navigation index only: open notes/<id>.md for the content and its "
+             "sources. This tree never rewrites a note.", ""]
     for area in sorted(areas, key=lambda n: n["label"].lower()):
-        lines.append(f"## {area['label']} [{area['status']}]")
-        if area["sources"]:
-            lines.append(f"Sources: {'; '.join(area['sources'])}")
+        kids = sorted(children.get(area["id"], []), key=lambda n: n["label"].lower())
+        lines.append(f"## {area['label']} [{area['status']}] ({len(kids)})")
         lines.append("")
-        for concept in sorted(children.get(area["id"], []),
-                              key=lambda n: n["label"].lower()):
-            shared = " (shared, also under other areas)" if len(concept.get("parents", [])) > 1 else ""
-            lines.append(f"- {concept['label']} [{concept['status']}]{shared}")
-            lines.append(f"  Sources: {'; '.join(concept['sources'])}")
+        for concept in kids:
+            shared = " (shared)" if len(concept.get("parents", [])) > 1 else ""
+            lines.append(f"- [{concept['label']}](notes/{concept['id']}.md) "
+                         f"[{concept['status']}]{shared}")
         lines.append("")
     orphaned = [n for n in concepts.values() if not n.get("parents")]
     if orphaned:
-        lines.append("## Unplaced concepts")
+        lines.append(f"## Unplaced concepts ({len(orphaned)})")
+        lines.append("")
         for concept in sorted(orphaned, key=lambda n: n["label"].lower()):
-            lines.append(f"- {concept['label']} [{concept['status']}]")
+            lines.append(f"- [{concept['label']}](notes/{concept['id']}.md) "
+                         f"[{concept['status']}]")
         lines.append("")
     return "\n".join(lines)
 

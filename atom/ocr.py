@@ -88,6 +88,11 @@ FALLBACK_LANG = "eng"
 # Cache location when the caller does not pass one. Pass cache_dir="" to
 # disable caching, or set ATOM_OCR_CACHE_DIR to move it.
 CACHE_ENV_VAR = "ATOM_OCR_CACHE_DIR"
+# The cache holds page renders and OCR text of the documents you converted,
+# so it is both large and private. It is capped (oldest files go first) and
+# can be cleared with `atom --clear-ocr-cache`.
+CACHE_MAX_ENV_VAR = "ATOM_OCR_CACHE_MAX_MB"
+DEFAULT_CACHE_MAX_MB = 1024
 DEFAULT_CACHE_DIRNAME = os.path.join(".cache", "atom-ocr")
 
 
@@ -398,9 +403,70 @@ def is_blank_image(data: bytes, threshold: float = BLANK_INK_THRESHOLD) -> bool:
 def default_cache_dir() -> str:
     """Cache directory: $ATOM_OCR_CACHE_DIR, else ~/.cache/atom-ocr."""
     override = os.environ.get(CACHE_ENV_VAR, "").strip()
+    if override.lower() in ("off", "0", "none", "false"):
+        return ""
     if override:
         return override
     return os.path.join(os.path.expanduser("~"), DEFAULT_CACHE_DIRNAME)
+
+
+def _cache_files(cache_dir: str) -> list[tuple[float, int, str]]:
+    out = []
+    try:
+        with os.scandir(cache_dir) as entries:
+            for entry in entries:
+                if entry.is_file(follow_symlinks=False):
+                    st = entry.stat(follow_symlinks=False)
+                    out.append((st.st_mtime, st.st_size, entry.path))
+    except OSError:
+        pass
+    return out
+
+
+def prune_cache(cache_dir: str | None = None, max_mb: float | None = None) -> int:
+    """Delete the oldest cache files until the cache fits in *max_mb*.
+
+    Returns the number of files removed. Never raises: a cache problem must
+    not break an extraction.
+    """
+    cache_dir = default_cache_dir() if cache_dir is None else cache_dir
+    if not cache_dir or not os.path.isdir(cache_dir):
+        return 0
+    if max_mb is None:
+        try:
+            max_mb = float(os.environ.get(CACHE_MAX_ENV_VAR, DEFAULT_CACHE_MAX_MB))
+        except ValueError:
+            max_mb = DEFAULT_CACHE_MAX_MB
+    files = sorted(_cache_files(cache_dir))
+    total = sum(size for _m, size, _p in files)
+    limit = max_mb * 1024 * 1024
+    removed = 0
+    for _mtime, size, path in files:
+        if total <= limit:
+            break
+        try:
+            os.unlink(path)
+            total -= size
+            removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def clear_cache(cache_dir: str | None = None) -> tuple[int, int]:
+    """Remove every file of the OCR/vision cache. Returns (files, bytes)."""
+    cache_dir = default_cache_dir() if cache_dir is None else cache_dir
+    count = size = 0
+    if not cache_dir:
+        return 0, 0
+    for _mtime, file_size, path in _cache_files(cache_dir):
+        try:
+            os.unlink(path)
+            count += 1
+            size += file_size
+        except OSError:
+            continue
+    return count, size
 
 
 def _cache_key(png: bytes, lang: str, psm: int) -> str:
@@ -531,18 +597,20 @@ def ocr_pdf_pages(pdf_path: str, page_count: int,
                   dpi: int = DEFAULT_DPI, lang: str | None = None,
                   psm: int = DEFAULT_PSM, jobs: int | None = None,
                   cache_dir: str | None = None, timeout: int = DEFAULT_TIMEOUT,
-                  triage: bool = True) -> list[tuple[int, str]]:
+                  triage: bool = True,
+                  pages: list[int] | None = None) -> list[tuple[int, str]]:
     """OCR pages 1..page_count via render + tesseract; skips failed pages.
 
     Keyword arguments are all optional and backwards compatible with the
     old ``(pdf_path, page_count)`` call: *lang* None auto-detects,
     *jobs* None uses up to 4 workers (bounded; tesseract runs are
     subprocess-bound), *cache_dir* None uses ``default_cache_dir()``
-    (pass ``""`` to disable caching), and *triage* skips blank and
+    (pass ``""`` to disable caching; ``ATOM_OCR_CACHE_DIR=off`` disables it too), and *triage* skips blank and
     near-blank pages before OCR. The cache also stores renders keyed by
     (PDF hash, page, DPI), because on this VM a render costs ~3s/page:
     without it a cached re-run would still pay full render time.
-    Returned pairs stay in page order
+    *pages* restricts OCR to those 1-based pages (a scanned page inside a
+    digital PDF). Returned pairs stay in page order
     regardless of worker count. Failures are logged to stderr and the
     page is skipped, exactly like the old sequential version.
     """
@@ -553,13 +621,16 @@ def ocr_pdf_pages(pdf_path: str, page_count: int,
         jobs = min(4, os.cpu_count() or 1)
     jobs = max(1, jobs)
     pdf_hash = _sha256_file(pdf_path) if cache_dir else None
+    wanted = pages if pages is not None else range(1, page_count + 1)
     args = [(pdf_path, page, dpi, resolved_lang, psm, cache_dir, timeout, triage, pdf_hash)
-            for page in range(1, page_count + 1)]
+            for page in wanted]
     if jobs == 1:
         results = [_ocr_one_page(*a) for a in args]
     else:
         with ThreadPoolExecutor(max_workers=jobs) as pool:
             results = list(pool.map(lambda a: _ocr_one_page(*a), args))
+    if cache_dir:
+        prune_cache(cache_dir)
     return [(page, text) for page, text in results if text]
 
 
@@ -773,7 +844,8 @@ def figure_block(page: int, index: int, meta: dict,
 
 
 def process_pdf_figures(pdf_path: str, lang: str | None = None,
-                        jobs: int | None = None) -> tuple[str, dict]:
+                        jobs: int | None = None,
+                        skip_pages: set | None = None) -> tuple[str, dict]:
     """Extract and OCR the embedded figures of a PDF.
 
     Repeated page decoration and tiny icons are skipped first
@@ -783,7 +855,12 @@ def process_pdf_figures(pdf_path: str, lang: str | None = None,
     counts figures, figures with OCR text, what was skipped, and whether
     any vision description was used.
     """
-    images, skipped = select_figures(extract_pdf_images(pdf_path))
+    images = extract_pdf_images(pdf_path)
+    if skip_pages:
+        # Pages already OCRed whole: their scan image is the page itself,
+        # and reading it again as a "figure" would repeat the page's text.
+        images = [img for img in images if img.get("page") not in skip_pages]
+    images, skipped = select_figures(images)
     resolved = resolve_lang(lang) if images and shutil.which("tesseract") else lang
     if jobs is None:
         jobs = min(4, os.cpu_count() or 1)
@@ -804,6 +881,8 @@ def process_pdf_figures(pdf_path: str, lang: str | None = None,
             vision_used = True
         blocks.append(figure_block(img["page"], img["index"], img,
                                    ocr_text, vision_text))
+    if os.environ.get(VISION_ENV_VAR, "").strip():
+        prune_cache()
     info = {
         "figures_extracted": len(images),
         "figures_with_ocr": with_ocr,

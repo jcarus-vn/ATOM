@@ -73,21 +73,135 @@ def clean_pdftotext(text: str) -> str:
     return _PDF_HYPHEN_WRAP.sub(r"\1\2", text)
 
 
-def extract_with_pdftotext(pdf_path: str) -> str | None:
+def pdftotext_pages(pdf_path: str, layout: bool = True) -> list[str] | None:
+    """Raw pdftotext output split into pages (form feeds), or None."""
     if not shutil.which("pdftotext"):
         return None
+    args = ["pdftotext"] + (["-layout"] if layout else []) + [
+        "-enc", "UTF-8", os.path.abspath(pdf_path), "-"]
     try:
-        pdf_path = os.path.abspath(pdf_path)
-        result = subprocess.run(
-            ["pdftotext", "-layout", "-enc", "UTF-8", pdf_path, "-"],
-            capture_output=True, text=True, timeout=120,
-            encoding="utf-8", errors="replace",
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return clean_pdftotext(result.stdout)
+        result = subprocess.run(args, capture_output=True, text=True, timeout=120,
+                                encoding="utf-8", errors="replace")
     except Exception as e:
-        print(f"  [warn] extract_with_pdftotext failed: {type(e).__name__}: {e}", file=sys.stderr)
-    return None
+        print(f"  [warn] extract_with_pdftotext failed: {type(e).__name__}: {e}",
+              file=sys.stderr)
+        return None
+    if result.returncode != 0:
+        return None
+    pages = result.stdout.split("\f")
+    if pages and not pages[-1].strip():
+        pages.pop()  # pdftotext ends every page, the last one included, with \f
+    return pages
+
+
+_RIGHT_START = re.compile(r" {3,}(?=\S)")
+
+
+def _right_column_start(lines: list[str]) -> int | None:
+    """Character position where a second column starts on this page, or None.
+
+    In ``-layout`` output the right column begins at (almost) the same
+    position on most lines, after a run of spaces. Positions in the middle
+    band of the page are counted in buckets of 3 characters; a bucket hit
+    by at least 40% of the text lines (and 6 of them) is a column edge. A
+    table inside a one-column page touches too few lines to qualify.
+    """
+    text_lines = [ln for ln in lines if ln.strip()]
+    if len(text_lines) < 8:
+        return None
+    width = max(len(ln.rstrip()) for ln in text_lines)
+    lo, hi = int(width * 0.25), int(width * 0.75)
+    buckets: dict[int, list[int]] = {}
+    for ln in text_lines:
+        for m in _RIGHT_START.finditer(ln):
+            x = m.end()
+            if lo <= x <= hi and len(ln) - x >= 8:
+                buckets.setdefault(x // 3, []).append(x)
+                break
+    if not buckets:
+        return None
+    key = max(buckets, key=lambda k: len(buckets[k]) + len(buckets.get(k - 1, []))
+              + len(buckets.get(k + 1, [])))
+    hits = buckets[key] + buckets.get(key - 1, []) + buckets.get(key + 1, [])
+    if len(hits) < max(6, 0.4 * len(text_lines)):
+        return None
+    return min(hits)
+
+
+def split_columns(page_text: str) -> str | None:
+    """Rewrite a two-column ``-layout`` page as left column, then right.
+
+    Returns None for a one-column page. A line that runs across the column
+    edge (a title or a full-width figure caption) stays whole in place.
+    """
+    lines = page_text.splitlines()
+    pos = _right_column_start(lines)
+    if pos is None:
+        return None
+    left: list[str] = []
+    right: list[str] = []
+    for ln in lines:
+        cut = None
+        for k in range(max(1, pos - 2), min(len(ln), pos + 3)):
+            if ln[k - 1] == " " and ln[k] != " " and not ln[max(0, k - 2):k].strip():
+                cut = k
+                break
+        if cut is None and len(ln) > pos and ln[pos - 1] != " ":
+            left.append(ln.rstrip())          # spans both columns
+        elif cut is None:
+            left.append(ln.rstrip())          # left column only (or blank)
+        else:
+            left.append(ln[:cut].rstrip())
+            right.append(ln[cut:].strip())
+    return "\n".join(left).rstrip() + "\n\n" + "\n".join(r for r in right)
+
+
+def looks_multicolumn(page_text: str) -> bool:
+    """True when a ``-layout`` page is set in two columns side by side."""
+    return _right_column_start(page_text.splitlines()) is not None
+
+
+def _page_has_text(page_text: str, min_chars: int = 30) -> bool:
+    return sum(1 for ch in page_text if ch.isalnum()) >= min_chars
+
+
+def extract_with_pdftotext_detail(pdf_path: str, ocr_pages_fn=None):
+    """pdftotext extraction, page by page. Returns (text, info) or (None, info).
+
+    - Pages laid out in two columns are rewritten column by column (left
+      column whole, then the right one), so sentences are not interleaved.
+    - Pages with no text layer (a scanned page inside a digital PDF) are
+      sent to *ocr_pages_fn* (page numbers -> {page: text}) when given, and
+      their text goes back in place, not at the end of the document.
+    info: ``column_pages`` and ``ocr_pages`` (1-based page numbers) and
+    ``empty_pages`` (no text and not OCRed).
+    """
+    info = {"column_pages": [], "ocr_pages": [], "empty_pages": []}
+    pages = pdftotext_pages(pdf_path, layout=True)
+    if pages is None:
+        return None, info
+    for i, page in enumerate(pages):
+        columns = split_columns(page)
+        if columns is not None:
+            pages[i] = columns
+            info["column_pages"].append(i + 1)
+    blank = [i + 1 for i, page in enumerate(pages) if not _page_has_text(page)]
+    if blank and ocr_pages_fn is not None and len(blank) < len(pages):
+        recovered = ocr_pages_fn(blank) or {}
+        for number, text in recovered.items():
+            if text and text.strip():
+                pages[number - 1] = text
+                info["ocr_pages"].append(number)
+    info["empty_pages"] = [n for n in blank if n not in info["ocr_pages"]]
+    joined = "\f".join(pages)
+    if not joined.strip():
+        return None, info
+    return clean_pdftotext(joined), info
+
+
+def extract_with_pdftotext(pdf_path: str) -> str | None:
+    text, _info = extract_with_pdftotext_detail(pdf_path)
+    return text
 
 
 def looks_image_only(pdf_path: str, pages: int = 5) -> bool:

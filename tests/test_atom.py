@@ -976,20 +976,21 @@ class TestDetectStructure:
         assert _chapter_number("فصل سی‌ام") == 30
 
     def test_persian_zwnj_ordinal_survives_sanitization(self):
-        """The ZWNJ spelling of 30 must still resolve after U+200C is stripped.
+        """The ZWNJ spelling of 30 resolves through the real pipeline.
 
-        sanitize_extracted_text() removes U+200C (a prompt-injection spacer)
-        before detect_structure() runs, so asserting on the raw heading alone
-        passes while the real pipeline misses the chapter.
+        A single ZWNJ between two Persian letters is spelling, so
+        sanitize_extracted_text() keeps it; the heading must resolve to 30
+        as sanitized, and also when a source omits the ZWNJ.
         """
         from atom.sanitize import sanitize_extracted_text
         from atom.utils import _chapter_number
 
         heading = "فصل سی‌ام"
         sanitized, removed = sanitize_extracted_text(heading)
-        assert removed == 1
-        assert sanitized != heading
+        assert removed == 0
+        assert sanitized == heading
         assert _chapter_number(sanitized) == 30
+        assert _chapter_number(heading.replace("\u200c", "")) == 30
 
     def test_persian_zwnj_chapter_detected_end_to_end(self):
         """A ZWNJ-spelled Persian heading is counted after sanitization."""
