@@ -38,9 +38,12 @@ function degrades to "unavailable" and the caller keeps the old behaviour.
 
 Measured on this machine (tesseract 5.3.4, clean synthetic renders,
 2026-10-27): raising render DPI from 150 to 400 roughly doubled wall time
-with no CER change, and PSM 3/4/6 gave identical CER, so the defaults
-stay at 200 dpi and PSM 6. Those knobs remain overridable for degraded
-real-world scans, where the clean-render measurement does not apply.
+with no CER change, so the default stays at 200 dpi. Page segmentation was
+measured again with tools/eval_ocr.py (2026-10-30): one-column pages read
+the same under PSM 3 and 6, but PSM 6 reads two-column pages across both
+columns and PSM 3 reads a full-page table column by column. Scanned pages
+therefore use PSM 3 with a PSM 6 fallback for tables (``ocr_page_bytes``);
+figures keep PSM 6.
 """
 
 from __future__ import annotations
@@ -206,6 +209,53 @@ def ocr_image_bytes(data: bytes, lang: str | None = None,
         return None
     text = _as_text(getattr(result, "stdout", "")).strip()
     return text or None
+
+
+# Page segmentation for scanned pages. PSM 3 (tesseract's automatic
+# layout) reads a page set in two columns column by column, where PSM 6
+# (one uniform block) joins the left and right line into one. PSM 3 in turn
+# splits a full-page table into its columns, which PSM 6 reads row by row.
+# So pages go through PSM 3 first, and a page that comes back as mostly
+# one- to three-word lines (the sign of a table cut into columns) is read
+# again with PSM 6. Measured with tools/eval_ocr.py; see docs/ocr-figures.md.
+PAGE_PSM = 3
+TABLE_PSM = 6
+TABLE_MAX_WORDS_PER_LINE = 3
+TABLE_MIN_LINES = 8
+
+
+def _median_words_per_line(text: str) -> tuple[int, int]:
+    """(median words per non-empty line, number of such lines)."""
+    counts = sorted(len(ln.split()) for ln in text.splitlines() if ln.strip())
+    if not counts:
+        return 0, 0
+    return counts[len(counts) // 2], len(counts)
+
+
+def _looks_like_split_table(text: str) -> bool:
+    """True when most lines hold three words or fewer (a table read
+    column by column), over enough lines to judge."""
+    median, lines = _median_words_per_line(text)
+    return lines >= TABLE_MIN_LINES and median <= TABLE_MAX_WORDS_PER_LINE
+
+
+def ocr_page_bytes(data: bytes, lang: str | None = None,
+                   timeout: int = DEFAULT_TIMEOUT, psm: int | None = None) -> str | None:
+    """OCR one rendered page so that two-column pages and tables both come
+    out in reading order.
+
+    *psm* None (the default) reads with PSM 3 and falls back to PSM 6 when
+    the result looks like a table split into columns (a second tesseract
+    run, only on such pages). An explicit *psm* is used as is.
+    """
+    if psm is not None:
+        return ocr_image_bytes(data, lang=lang, timeout=timeout, psm=psm)
+    text = ocr_image_bytes(data, lang=lang, timeout=timeout, psm=PAGE_PSM)
+    if text and _looks_like_split_table(text):
+        rows = ocr_image_bytes(data, lang=lang, timeout=timeout, psm=TABLE_PSM)
+        if rows and _median_words_per_line(rows)[0] > _median_words_per_line(text)[0]:
+            return rows
+    return text
 
 
 def ocr_image_file(path: str, lang: str | None = None,
@@ -469,17 +519,25 @@ def clear_cache(cache_dir: str | None = None) -> tuple[int, int]:
     return count, size
 
 
-def _cache_key(png: bytes, lang: str, psm: int) -> str:
+# Bump when the text produced for the same page render changes, so a cache
+# filled by an older version is not served. 2: pages read with PSM 3 (two
+# columns in order), PSM 6 for tables.
+PAGE_TEXT_VERSION = "2"
+
+
+def _cache_key(png: bytes, lang: str, psm: int | None) -> str:
     digest = hashlib.sha256()
+    digest.update(PAGE_TEXT_VERSION.encode("ascii"))
+    digest.update(b"\0")
     digest.update(png)
     digest.update(b"\0")
     digest.update(lang.encode("utf-8"))
     digest.update(b"\0")
-    digest.update(str(psm).encode("ascii"))
+    digest.update(("auto" if psm is None else str(psm)).encode("ascii"))
     return digest.hexdigest()
 
 
-def _cache_get(cache_dir: str | None, png: bytes, lang: str, psm: int) -> str | None:
+def _cache_get(cache_dir: str | None, png: bytes, lang: str, psm: int | None) -> str | None:
     if not cache_dir:
         return None
     try:
@@ -491,7 +549,7 @@ def _cache_get(cache_dir: str | None, png: bytes, lang: str, psm: int) -> str | 
         return None
 
 
-def _cache_put(cache_dir: str | None, png: bytes, lang: str, psm: int, text: str) -> None:
+def _cache_put(cache_dir: str | None, png: bytes, lang: str, psm: int | None, text: str) -> None:
     if not cache_dir or not text:
         return
     try:
@@ -575,7 +633,7 @@ def _render_cached(pdf_path: str, page: int, dpi: int,
     return png
 
 
-def _ocr_one_page(pdf_path: str, page: int, dpi: int, lang: str, psm: int,
+def _ocr_one_page(pdf_path: str, page: int, dpi: int, lang: str, psm: int | None,
                    cache_dir: str | None, timeout: int, triage: bool,
                    pdf_hash: str | None = None) -> tuple[int, str | None]:
     """Render + (triage) + OCR one page. Returns (page, text or None)."""
@@ -587,7 +645,7 @@ def _ocr_one_page(pdf_path: str, page: int, dpi: int, lang: str, psm: int,
     cached = _cache_get(cache_dir, png, lang, psm)
     if cached is not None:
         return page, cached
-    text = ocr_image_bytes(png, lang=lang, timeout=timeout, psm=psm)
+    text = ocr_page_bytes(png, lang=lang, timeout=timeout, psm=psm)
     if text:
         _cache_put(cache_dir, png, lang, psm, text)
     return page, text
@@ -595,7 +653,7 @@ def _ocr_one_page(pdf_path: str, page: int, dpi: int, lang: str, psm: int,
 
 def ocr_pdf_pages(pdf_path: str, page_count: int,
                   dpi: int = DEFAULT_DPI, lang: str | None = None,
-                  psm: int = DEFAULT_PSM, jobs: int | None = None,
+                  psm: int | None = None, jobs: int | None = None,
                   cache_dir: str | None = None, timeout: int = DEFAULT_TIMEOUT,
                   triage: bool = True,
                   pages: list[int] | None = None) -> list[tuple[int, str]]:
@@ -606,7 +664,8 @@ def ocr_pdf_pages(pdf_path: str, page_count: int,
     *jobs* None uses up to 4 workers (bounded; tesseract runs are
     subprocess-bound), *cache_dir* None uses ``default_cache_dir()``
     (pass ``""`` to disable caching; ``ATOM_OCR_CACHE_DIR=off`` disables it too), and *triage* skips blank and
-    near-blank pages before OCR. The cache also stores renders keyed by
+    near-blank pages before OCR. *psm* None picks the segmentation per
+    page (see ``ocr_page_bytes``); a number forces it. The cache also stores renders keyed by
     (PDF hash, page, DPI), because on this VM a render costs ~3s/page:
     without it a cached re-run would still pay full render time.
     *pages* restricts OCR to those 1-based pages (a scanned page inside a

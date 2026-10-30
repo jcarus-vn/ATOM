@@ -54,6 +54,7 @@ ENTRY_POINTS = {
     "tools/eval_taxonomy_lookup.py": "usage: eval_taxonomy_lookup.py [-h]",
     "tools/eval_answer_quality.py": "usage: eval_answer_quality.py [-h]",
     "tools/build_compact.py": "usage: build_compact.py [-h] legacy_dir out_dir",
+    "tools/eval_ocr.py": "usage: eval_ocr.py [-h]",
     "atom_brain/cli.py": "atom · turns a document into a structured agent skill",
 }
 
