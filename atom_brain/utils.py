@@ -1516,7 +1516,7 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
                     )
                 extraction_mode = "text"
                 
-        if extraction_mode == "text" or not text:
+        if not text:  # OCR of a scanned PDF or Docling may already have the text
             print("Mode: text — using pdftotext...")
             print("Trying pdftotext...", end=" ", flush=True)
 
