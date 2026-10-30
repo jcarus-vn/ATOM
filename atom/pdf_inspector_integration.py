@@ -163,6 +163,14 @@ def _result_from_inspector(
         "filename": input_path.name,
         "format": "pdf",
         "extraction_method": "pdf-inspector",
+        # Same keys as utils.extract_single_file's record: main() reads
+        # every one of them when it writes metadata.json.
+        "fallback_reason": None,
+        "ocr_mode": "off",
+        "ocr_pages": 0,
+        "figures_extracted": 0,
+        "figures_with_ocr": 0,
+        "vision_used": False,
         "file_size_mb": round(file_size_mb, 2),
         "sha256": file_sha256,
         "pages": pages,

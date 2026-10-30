@@ -36,7 +36,7 @@ class FakeResponse:
         self._body = body.encode("utf-8")
         self.headers = FakeHeaders()
 
-    def read(self):
+    def read(self, amt=None):
         return self._body
 
     def __enter__(self):

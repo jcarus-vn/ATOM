@@ -44,6 +44,9 @@ class Chapter:
     strategy: str = "heuristic"
     confidence: float = 0.5
     strategies: tuple[str, ...] = field(default_factory=tuple)
+    # Index of the heading's line in the whole text; used to keep merged
+    # chapters in document order. Not part of as_dict().
+    row: int = field(default=-1, repr=False, compare=False)
 
     def as_dict(self) -> dict:
         return {
@@ -95,10 +98,20 @@ _EXPLICIT_WORDS = (
 _EXPLICIT = re.compile(
     r"^\s*(?:#+\s+)?(?:"
     + _EXPLICIT_WORDS
-    + r")\s*(?:(\d{1,2})|([IVXLCDMivxlcdm]{1,7}))\b(.*)$",
+    + r")\s*(?:(\d{1,3})|([IVXLCDMivxlcdm]{1,7}))\b(.*)$",
     re.IGNORECASE,
 )
-_HEADING_TAIL = re.compile(r"^\s*$|^\s*[.:\-]|^\s+(?![a-z])")
+_HEADING_TAIL_PUNCT = re.compile(r"^\s*$|^\s*[.:\-\u2013\u2014]")
+
+
+def _heading_tail_ok(rest: str) -> bool:
+    """Same rule as utils: lowercase is judged by Unicode, so prose such as
+    "Chương 2 đã trình bày…" is not a heading."""
+    if _HEADING_TAIL_PUNCT.match(rest):
+        return True
+    if not rest[:1].isspace():
+        return False
+    return not rest.lstrip()[:1].islower()
 _ROMAN_HEAD = re.compile(r"^\s*(?:#+\s+)?([IVXLCDM]+)\s*[:.]\s+([A-Z][^\n]{0,70})$")
 _PLAIN_NUMBERED = re.compile(r"^\s*(\d{1,2})\s{2,}(\S.*)$")
 _DOTTED_NUMBERED = re.compile(r"^\s*(\d{1,2}(?:\.\d{1,2})?)[.)]\s+(\S.*)$")
@@ -156,14 +169,14 @@ def _flatten(text: str) -> list[tuple[int, int, str]]:
 
 def _explicit_chapters(rows: list[tuple[int, int, str]]) -> list[Chapter]:
     out = []
-    for page, _idx, line in rows:
+    for row_i, (page, _idx, line) in enumerate(rows):
         s = line.strip()
         if len(s) > 80:
             continue
         m = _EXPLICIT.match(s)
         if m:
             rest = m.group(3) or ""
-            if not _HEADING_TAIL.match(rest):
+            if not _heading_tail_ok(rest):
                 continue
             if m.group(1):
                 number = int(m.group(1))
@@ -176,7 +189,8 @@ def _explicit_chapters(rows: list[tuple[int, int, str]]) -> list[Chapter]:
                 continue
             out.append(Chapter(title=title, number=number, page=page,
                                line=len(out), strategy="explicit",
-                               confidence=0.95, strategies=("explicit",)))
+                               confidence=0.95, strategies=("explicit",),
+                               row=row_i))
             continue
         rm = _ROMAN_HEAD.match(s)
         if rm:
@@ -185,7 +199,8 @@ def _explicit_chapters(rows: list[tuple[int, int, str]]) -> list[Chapter]:
                 continue
             out.append(Chapter(title=_norm(s), number=number, page=page,
                                line=len(out), strategy="explicit",
-                               confidence=0.9, strategies=("explicit",)))
+                               confidence=0.9, strategies=("explicit",),
+                               row=row_i))
     return out
 
 
@@ -220,24 +235,23 @@ def _toc_chapters(rows: list[tuple[int, int, str]]) -> list[Chapter]:
     # Index the body once (normalized line -> first row) instead of
     # re-scanning the whole body and re-normalizing every line per entry,
     # which was quadratic in (entries x body lines).
-    body = rows[toc_at + 1:]
-    first_body_row: dict[str, tuple[int, int, str]] = {}
-    for row in body:
-        first_body_row.setdefault(_norm(row[2]), row)
+    first_body_row: dict[str, int] = {}
+    for idx in range(toc_at + 1, len(rows)):
+        first_body_row.setdefault(_norm(rows[idx][2]), idx)
     out = []
     for title, toc_page in entries:
-        row = first_body_row.get(title)
-        if row is not None:
-            page = row[0]
-            out.append(Chapter(title=title, number=None, page=page,
+        idx = first_body_row.get(title)
+        if idx is not None:
+            out.append(Chapter(title=title, number=None, page=rows[idx][0],
                                line=len(out), strategy="toc",
-                               confidence=0.8, strategies=("toc",)))
+                               confidence=0.8, strategies=("toc",), row=idx))
         else:
             # Entry never reappears as a heading: keep it, but say so with a
             # lower confidence and the ToC page number, not a body page.
             out.append(Chapter(title=title, number=None, page=toc_page,
                                line=len(out), strategy="toc",
-                               confidence=0.45, strategies=("toc",)))
+                               confidence=0.45, strategies=("toc",),
+                               row=toc_at))
     return out
 
 
@@ -342,6 +356,7 @@ def _heuristic_chapters(rows: list[tuple[int, int, str]]) -> list[Chapter]:
             continue
         seen[ch.title] = i
         ch.line = len(out)
+        ch.row = i
         out.append(ch)
     return out
 
@@ -384,7 +399,7 @@ def _fallback_sections(rows: list[tuple[int, int, str]]) -> list[Chapter]:
             seen.add(title)
             out.append(Chapter(title=title, page=page, line=len(out),
                                strategy="fallback", confidence=0.4,
-                               strategies=("fallback",)))
+                               strategies=("fallback",), row=i))
     return out
 
 
@@ -408,6 +423,10 @@ def _merge(lists: list[list[Chapter]]) -> list[Chapter]:
                 if existing.number is None:
                     existing.number = ch.number
     merged = [by_key[k] for k in order]
+    # Document order: strategies are collected one after another, so
+    # without this a heuristic chapter found between explicit chapters 1
+    # and 2 would be listed (and numbered) after the last explicit one.
+    merged.sort(key=lambda ch: ch.row)
     # Renumber sequentially where no explicit number exists, preserving any
     # explicit numbers already found.
     next_num = 1

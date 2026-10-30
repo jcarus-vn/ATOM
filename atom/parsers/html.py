@@ -85,6 +85,25 @@ class _HTMLTextExtractor(html.parser.HTMLParser):
         return "".join(self._parts)
 
 
+def soup_text(soup) -> str:
+    """Text of a BeautifulSoup tree with line breaks at BLOCK boundaries only.
+
+    ``get_text(separator="\n")`` puts a newline around every tag, so inline
+    markup splits sentences ("The \nKalman filter\n is an..."), which also
+    breaks heading and term detection downstream. This mirrors
+    _HTMLTextExtractor: newline at block tags, tab between table cells.
+    """
+    import re
+    for tag in soup.find_all(list(_HTMLTextExtractor.BLOCK_TAGS)):
+        tag.insert_before("\n")
+        tag.insert_after("\n")
+    for cell in soup.find_all(list(_HTMLTextExtractor.CELL_TAGS)):
+        cell.insert_after("\t")
+    text = soup.get_text()
+    text = re.sub(r"[ \t]*\n\s*", "\n", text)
+    return text.strip()
+
+
 def extract_html_content(raw_html: str) -> str:
     # Prints mirror extract_docx()'s "Trying X..." style so a run
     # says which of the three extractors actually answered, instead of
@@ -125,7 +144,7 @@ def extract_html_content(raw_html: str) -> str:
         for element in soup(["script", "style", "head"]):
             element.decompose()
         print("OK")
-        return soup.get_text(separator="\n")
+        return soup_text(soup)
     except ImportError:
         print("not available")
         print("Trying stdlib HTML parser...", end=" ", flush=True)

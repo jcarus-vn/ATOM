@@ -76,6 +76,7 @@ class TestTesseractPaths:
         tool is absent, so the suite stays green on machines without it."""
         if not shutil.which("tesseract"):
             pytest.skip("tesseract not installed on this machine")
+        pytest.importorskip("PIL")
         from PIL import Image, ImageDraw
 
         img = Image.new("RGB", (400, 100), "white")

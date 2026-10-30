@@ -3,6 +3,7 @@ from __future__ import annotations
 import zipfile
 import sys
 from atom.exceptions import ExtractionError
+from atom.parsers.zip_limits import check_zip_limits
 
 
 def extract_docx_with_python_docx(docx_path: str) -> str | None:
@@ -113,6 +114,7 @@ def validate_docx_xml_safety(docx_path: str) -> None:
     """Scan all XML files in the DOCX zip archive to prevent XML Entity Expansion (Billion Laughs) and XXE injections."""
     try:
         with zipfile.ZipFile(docx_path) as zf:
+            check_zip_limits(zf, "DOCX")
             for name in zf.namelist():
                 if name.endswith(".xml") or name.endswith(".rels"):
                     xml_bytes = zf.read(name)
@@ -144,7 +146,7 @@ def extract_docx(docx_path: str) -> tuple[str, str]:
         print("OK")
         return text, "python-docx"
 
-    print("not available")
+    print("not used (not installed, or failed: see any warning above)")
     print("Trying stdlib DOCX parser...", end=" ", flush=True)
     text = extract_docx_with_zipfile(docx_path)
     if text and text.strip():

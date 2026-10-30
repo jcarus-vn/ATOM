@@ -20,6 +20,7 @@ from atom.config import (
     OUTPUT_DIR,
     OUTPUT_TEXT,
     OUTPUT_META,
+    OUTPUT_CHAPTERS,
     WORDS_PER_TOKEN,
     CJK_CHARS_PER_TOKEN,
     SUPPORTED_EXTENSIONS,
@@ -29,6 +30,7 @@ from atom.config import (
     supported_formats_message,
 )
 from atom.dependencies import (
+    INSTALL_MODE_WORDS,
     normalize_install_mode,
     prepare_dependencies,
     run_dependency_check,
@@ -66,6 +68,8 @@ from atom.web_input import (
 # Covers and decorative assets are common in prose EPUBs, so only surface the
 # omission when the archive contains more than five images.
 _EPUB_IMAGE_NOTICE_THRESHOLD = 5
+# Chapter entries kept inline in metadata.json; the rest is in chapters.json.
+CHAPTER_SUMMARY_LIMIT = 60
 
 
 # CJK codepoints: ideographs + extensions, kana, hangul, CJK punctuation, and
@@ -123,14 +127,38 @@ def estimate_tokens(text: str) -> int:
 # 1..99 — drops years like "2025.") and whatever follows it on the line, so we
 # can reject prose.
 _EXPLICIT_CHAPTER = re.compile(
-    r"^\s*(?:chapter|unit|lesson|module|lecture|part|chapitre|kapitel|cap[ií]tulo|capitolo|hoofdstuk|chương|ch\.?)\s*(?:(\d{1,2})|(?P<roman>[IVXLCDMivxlcdm]{1,7}))\b(?P<rest>.*)$",
+    r"^\s*(?:chapter|unit|lesson|module|lecture|part|chapitre|kapitel|cap[ií]tulo|capitolo|hoofdstuk|chương|ch\.?)\s*(?:(\d{1,3})|(?P<roman>[IVXLCDMivxlcdm]{1,7}))\b(?P<rest>.*)$",
     re.IGNORECASE,
 )
 # A heading's number is followed by end-of-line, punctuation (“. : - —“), or a
 # Capitalized title word. A lowercase continuation (“Chapter 6 explores...”,
 # “Chapter 8 are relevant...”) is prose / a cross-reference, not a heading.
 # The uppercase class is À-Þ so titles starting with Ü/Û (common in German, e.g. “Überblick”) are recognized.
-_HEADING_TAIL = re.compile(r"^\s*$|^\s*[.:\-—–]|^\s+(?![a-z])")
+_HEADING_TAIL_PUNCT = re.compile(r"^\s*$|^\s*[.:\-—–]")
+
+
+def _heading_tail_ok(rest: str) -> bool:
+    """End of line, punctuation, or a title word that does not start
+    lowercase. Lowercase is judged by Unicode, so a Vietnamese, French or
+    German prose continuation ("Chương 2 đã trình bày…", "Chapitre 3 été…")
+    is rejected like "Chapter 6 explores…" always was."""
+    if _HEADING_TAIL_PUNCT.match(rest):
+        return True
+    if not rest[:1].isspace():
+        return False
+    first = rest.lstrip()[:1]
+    return not first.islower()
+
+
+class _HeadingTail:
+    """Back-compat shim: ``_HEADING_TAIL.match(rest)`` keeps working."""
+
+    @staticmethod
+    def match(rest: str) -> bool:
+        return _heading_tail_ok(rest)
+
+
+_HEADING_TAIL = _HeadingTail()
 # A tail that opens with a sentence period — "Chapter 4. References are
 # indicated by the `&` symbol…", "Chapter 17.) We have seen…" — is prose wrapped
 # at the column limit, unless it reads like a title. Two shapes, measured on the
@@ -1066,6 +1094,9 @@ def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
     }
 
 
+_ON_OFF_WORDS = frozenset({"on", "off", "yes", "no", "true", "false", "1", "0"})
+
+
 def parse_arguments(argv: list[str]) -> tuple[list[str], str, str]:
     """Parse argv into (input_paths, extraction_mode, install_mode).
 
@@ -1090,12 +1121,12 @@ def parse_arguments(argv: list[str]) -> tuple[list[str], str, str]:
         elif arg in ("--chapter-mode", "--ocr"):
             i += 2 if i + 1 < len(args) else 1
         elif arg == "--ocr-figures":
-            if i + 1 < len(args) and not args[i+1].startswith("--"):
+            if i + 1 < len(args) and args[i+1].lower() in _ON_OFF_WORDS:
                 i += 2
             else:
                 i += 1
         elif arg == "--install-missing":
-            if i + 1 < len(args) and not args[i+1].startswith("--"):
+            if i + 1 < len(args) and args[i+1].lower() in INSTALL_MODE_WORDS:
                 i += 2
             else:
                 i += 1
@@ -1138,7 +1169,7 @@ def parse_extended_options(argv: list[str]) -> dict:
                 ocr_mode = args[i+1].lower()
             i += 2
         elif arg == "--ocr-figures":
-            if i + 1 < len(args) and not args[i+1].startswith("--"):
+            if i + 1 < len(args) and args[i+1].lower() in _ON_OFF_WORDS:
                 ocr_figures = args[i+1].lower() not in ("off", "no", "false", "0")
                 i += 2
             else:
@@ -1569,8 +1600,12 @@ def extract_single_file(input_path: Path, extraction_mode: str, install_mode: st
         blocks, figures_info = ocr_module.process_pdf_figures(input_str)
         if blocks:
             text = (text + "\n\n" + blocks) if text else blocks
+            skipped = (figures_info.get("figures_repeated_skipped", 0)
+                       + figures_info.get("figures_small_skipped", 0)
+                       + figures_info.get("figures_duplicate_skipped", 0))
             print(f"  [figures] {figures_info['figures_extracted']} figure(s) "
-                  f"extracted, {figures_info['figures_with_ocr']} with OCR text",
+                  f"extracted, {figures_info['figures_with_ocr']} with OCR text"
+                  + (f", {skipped} repeated/tiny image(s) skipped" if skipped else ""),
                   file=sys.stderr)
 
     text, removed_invisible = sanitize_extracted_text(text)
@@ -1752,7 +1787,33 @@ def main():
             print(f"WARNING: Skipping {url}: {exc}", file=sys.stderr)
             errors.append((Path(url), str(exc)))
             continue
-        import hashlib
+        if web.get("document_path"):
+            # A PDF behind the URL: the PDF chain extracts it; the record
+            # keeps the URL and fetch date as its citation.
+            doc_path = Path(web["document_path"])
+            try:
+                res = extract_single_file(doc_path, extraction_mode, install_mode,
+                                          chapter_mode=options["chapter_mode"],
+                                          ocr_mode=options["ocr_mode"],
+                                          ocr_figures=options["ocr_figures"])
+            except ExtractionError as exc:
+                print(f"WARNING: Skipping {url}: {exc}", file=sys.stderr)
+                errors.append((Path(url), str(exc)))
+                continue
+            finally:
+                try:
+                    doc_path.unlink()
+                except OSError:
+                    pass
+            res.update({"source_file": url, "filename": web["title"],
+                        "url": url, "title": web["title"],
+                        "fetched_at": web["fetched_at"]})
+            extracted_sources.append(res)
+            combined_texts.append(
+                f"\n\n{'=' * 80}\nSOURCE (web): {web['title']} (URL: {url}, "
+                f"fetched {web['fetched_at'][:10]} - web content may have "
+                f"changed since fetch)\n{'=' * 80}\n\n" + res["text"])
+            continue
         web_text, _removed = sanitize_extracted_text(web["text"])
         web_structure = detect_structure(web_text, options["chapter_mode"])
         title = web["title"] or url
@@ -1878,19 +1939,19 @@ def main():
                 "filename": src["filename"],
                 "format": src["format"],
                 "extraction_method": src["extraction_method"],
-                "fallback_reason": src["fallback_reason"],
+                "fallback_reason": src.get("fallback_reason"),
                 "file_size_mb": src["file_size_mb"],
                 "sha256": src["sha256"],
                 "pages": src["pages"],
-                "pages_label": src["pages_label"],
+                "pages_label": src.get("pages_label"),
                 "chars": src["chars"],
                 "words": src["words"],
                 "estimated_tokens": src["estimated_tokens"],
-                "images_dropped": src["images_dropped"],
-                "chapters_detected": src["chapters_detected"],
-                "chapters_method": src["chapters_method"],
-                "chapter_headings_sample": src["chapter_headings_sample"],
-                "chapter_details": src.get("chapter_details", []),
+                "images_dropped": src.get("images_dropped"),
+                "chapters_detected": src.get("chapters_detected"),
+                "chapters_method": src.get("chapters_method"),
+                "chapter_headings_sample": src.get("chapter_headings_sample"),
+                "chapter_details_total": len(src.get("chapter_details") or []),
                 "chapter_detection": src.get("chapter_detection", {}),
                 "ocr_mode": src.get("ocr_mode"),
                 "ocr_pages": src.get("ocr_pages", 0),
@@ -1900,12 +1961,29 @@ def main():
                 "url": src.get("url"),
                 "title": src.get("title"),
                 "fetched_at": src.get("fetched_at"),
-                "has_toc": src["has_toc"]
+                "has_toc": src.get("has_toc")
             }
             for src in extracted_sources
         ],
         **consolidated_structure,
     }
+    # The full chapter list can run to thousands of entries (every numbered
+    # section of a long book), which made metadata.json, the file the agent
+    # reads first, cost 17k-150k tokens. It goes to chapters.json; metadata
+    # keeps a short summary of it.
+    all_details = consolidated_structure.get("chapter_details") or []
+    metadata["chapter_details"] = [
+        {k: c.get(k) for k in ("title", "number", "page", "strategy", "confidence")}
+        for c in all_details[:CHAPTER_SUMMARY_LIMIT]]
+    metadata["chapter_details_total"] = len(all_details)
+    chapters_path = Path(OUTPUT_META).with_name(OUTPUT_CHAPTERS.name)
+    metadata["chapter_details_file"] = str(chapters_path)
+    chapters_path.write_text(json.dumps({
+        "overall": all_details,
+        "sources": [{"filename": src["filename"],
+                     "chapter_details": src.get("chapter_details", [])}
+                    for src in extracted_sources],
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
     
     # encoding="utf-8" is required, not cosmetic: the payload is dumped with
     # ensure_ascii=False, so any non-ASCII chapter heading, filename or path

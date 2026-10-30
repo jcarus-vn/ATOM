@@ -42,7 +42,7 @@ Books contain crystallized expertise: frameworks, principles, and techniques tha
 
 ## Modes of Operation
 
-Four paths available. Route based on what the user asks:
+Five paths available. Route based on what the user asks:
 
 ### 1. Full Conversion (Default)
 **Trigger:** User provides one or more document/directory/glob paths without special instructions
@@ -87,8 +87,8 @@ This converter can run from multiple skill systems. When looking for this conver
 10. Hermes Agent project skills: `.hermes/skills/` or `.agents/skills/`
 11. OpenClaw personal skills: `${OPENCLAW_STATE_DIR:-~/.openclaw}/skills/` (active state; `~/.agents/skills/` is shared only with the default state)
 12. OpenClaw project skills: `.agents/skills/` or `skills/`
-11. OpenCode personal skills: `~/.config/opencode/skills/` or `~/.agents/skills/`
-12. OpenCode project skills: `.opencode/skills/` or `.agents/skills/`
+13. OpenCode personal skills: `~/.config/opencode/skills/` or `~/.agents/skills/`
+14. OpenCode project skills: `.opencode/skills/` or `.agents/skills/`
 
 For **generated** book skills, prefer the user-level cross-agent root `~/.agents/skills/` — one physical copy serves the cross-agent hosts and OpenClaw when it uses its default state. Copilot CLI and Amp discover it natively; Claude Code needs a symlink from `~/.claude/skills/<skill_name>` (created in Step 10, see Step 5 for the rules). Pick a host-private or project-local root only when the user explicitly asks for one. `BOOK_TO_SKILL_SCOPE=project` or `personal` can make that choice explicit for automation; do not ask a mandatory scope question merely because both scopes are available.
 
@@ -405,13 +405,11 @@ Choose the destination skill root (`SKILLS_HOME`). First resolve **scope** from 
 | **Hermes Agent** | `$HERMES_HOME/skills/<category>` (defaults to `~/.hermes/skills/<category>`) | `.hermes/skills/<category>` → `.agents/skills` |
 | **Claude Code** | `~/.agents/skills` + symlink from `~/.claude/skills/<skill_name>` | `.claude/skills` |
 | **OpenClaw** | `${OPENCLAW_STATE_DIR:-~/.openclaw}/skills` (active state; `~/.agents/skills` only with default state) | `.agents/skills` → `skills/` |
+| **OpenCode** | `~/.agents/skills` (discovered natively; `~/.config/opencode/skills` and `~/.claude/skills` are read too) | `.opencode/skills` → `.agents/skills` → `.claude/skills` |
 
 Hermes Agent is the one host that keeps its own personal root: it partitions personal skills by category and does not scan the cross-agent root. Use the active profile's `HERMES_HOME` and choose a category that matches the generated skill's subject. Do not construct profile paths manually. If the user selects a project-local Hermes root, run `hermes skills trust <project-root>` after generation and verify discovery with `hermes skills list`; project skills remain unavailable until the project is trusted.
 
 For OpenClaw, use the active state directory's `skills/` root: `${OPENCLAW_STATE_DIR:-~/.openclaw}/skills/`. The shared `~/.agents/skills` compatibility root is discoverable only when `OPENCLAW_STATE_DIR` is unset or the default `~/.openclaw`; with a non-default state, do not claim that OpenClaw will see a shared-root install. Verify discovery with `openclaw skills list` after generation.
-| **OpenCode** | `~/.agents/skills` (discovered natively; `~/.config/opencode/skills` and `~/.claude/skills` are read too) | `.opencode/skills` → `.agents/skills` → `.claude/skills` |
-
-Hermes Agent is the one host that keeps its own personal root: it partitions personal skills by category and does not scan the cross-agent root. Use the active profile's `HERMES_HOME` and choose a category that matches the generated skill's subject. Do not construct profile paths manually. If the user selects a project-local Hermes root, run `hermes skills trust <project-root>` after generation and verify discovery with `hermes skills list`; project skills remain unavailable until the project is trusted.
 
 OpenCode scans the cross-agent `~/.agents/skills` root natively, so the generated-skill default above already serves it — no symlink and no trust step. It also reads its own managed `~/.config/opencode/skills` root and the Claude compatibility root `~/.claude/skills`; use the OpenCode-managed root only when the user asks for it. Project skills are discovered by walking up from the working directory to the git worktree, so start a new session after generation if the skill does not appear. (`~/.cache/opencode/skills` is the remote-skill download cache from `skills.urls`, not an authoring root — never write a generated skill there.)
 
@@ -468,7 +466,7 @@ If a chapter genuinely has no worked example and resists expansion, let it land 
 For EACH chapter/major section identified in Step 3:
 
 Read the corresponding section of the extracted `full_text.txt` (use character offsets or grep for chapter headings).
-**Chapter boundaries:** `metadata.json` also carries `chapter_details` (title, page, strategy, confidence per chapter) from the flexible detector; prefer it over re-guessing headings, and report its `chapter_detection.method` when the count looks surprising.
+**Chapter boundaries:** `metadata.json` carries a short `chapter_details` summary (title, page, strategy, confidence; first 60 entries, `chapter_details_total` gives the count) from the flexible detector, and `chapters.json` beside it holds the full list; prefer them over re-guessing headings, and report `chapter_detection.method` when the count looks surprising.
 **Figure blocks are first-class knowledge:** extracted text may contain `[FIGURE page N, figure M | ...]` blocks with OCR text from inside the figure and, when configured, a vision description labelled `vision-derived, cần kiểm chứng`. Rules read off a diagram belong in patterns.md/cheatsheet.md with the figure's page cited; a claim that comes only from a vision description stays marked unverified, never stated as fact. A figure whose OCR came back empty keeps its placeholder: do not invent its content.
 
 Create `$SKILLS_HOME/<skill_name>/chapters/ch<NN>-<slug>.md` using the structure below.
@@ -684,6 +682,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
   PYTHON_BIN="python"
 fi
+```
 
 Remove **the work directory this run actually used** — the `Workdir ->` path from the
 extraction output, which is also stored as `workdir` in `metadata.json`. Never delete a

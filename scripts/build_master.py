@@ -32,6 +32,7 @@ if __name__ == "__main__":
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from atom.master import (  # noqa: E402
+    validate_manifest,
     bound_view,
     build_master,
     list_masters,
@@ -47,6 +48,17 @@ from atom.compact import (  # noqa: E402
     load_compact_dir,
     query_compact_dir,
 )
+
+
+# Measured on the Robotics master: every gold question's top hit scores
+# >= 12.2 and every gold note in a top 5 >= 8.0, while off-topic questions
+# ("What is the capital of France?") top out at 7.0. Below this a hit is
+# keyword noise, and answering from it would be inventing an answer.
+MIN_ANSWER_SCORE = 8.0
+
+
+def _confident(ranked: list[dict], min_score: float) -> list[dict]:
+    return [hit for hit in ranked if hit["score"] >= min_score]
 
 
 def default_root() -> Path:
@@ -74,6 +86,10 @@ def main(argv=None) -> int:
                              "with --term/--facet/--status and --question")
     parser.add_argument("--top", type=int, default=5,
                         help="Notes to show for --question (default 5)")
+    parser.add_argument("--min-score", type=float, default=MIN_ANSWER_SCORE,
+                        help="Hide --question hits scoring below this "
+                             f"(default {MIN_ANSWER_SCORE}); with none left "
+                             "the master says it holds no answer")
     parser.add_argument("--compact-dir", type=Path, default=None,
                         help="With --question: answer from one compact master"
                              " directory (registry.json + index.json + "
@@ -112,10 +128,14 @@ def main(argv=None) -> int:
             registry, _index = load_compact_dir(args.compact_dir)
             ranked = query_compact_dir(args.compact_dir, args.question,
                                        k=args.top, source=args.source)
-            ranked = ranked[:args.top]
+            ranked = _confident(ranked[:args.top], args.min_score)
             bound_note = f" [bound to source: {args.source}]" \
                 if args.source else ""
             print(f"[compact] top {args.top} for: {args.question}{bound_note}")
+            if not ranked:
+                print(f"  No note scores {args.min_score} or more: this master "
+                      "does not hold an answer to that question.")
+                return 0
             for hit in ranked:
                 note = hit["note"]
                 print(f"  - {note['title']} [{note['status']}] "
@@ -147,10 +167,15 @@ def main(argv=None) -> int:
                                 master.get("graph", {}).get("edges", []),
                                 args.question, k=args.top,
                                 source=args.source)
+            ranked = _confident(ranked, args.min_score)
             bound_note = f" [bound to source: {args.source}]" \
                 if args.source else ""
             print(f"[{entry['field']}] top {args.top} for: {args.question}"
                   f"{bound_note}")
+            if not ranked:
+                print(f"  No note scores {args.min_score} or more: this master "
+                      "does not hold an answer to that question.")
+                continue
             for hit in ranked:
                 note = hit["note"]
                 print(f"  - {note['title']} [{note['status']}] "
@@ -175,16 +200,21 @@ def main(argv=None) -> int:
             return 1
         return 0
 
-    if not args.field:
-        parser.error("--field is required to build a master skill")
     sources = []
     manifest_taxonomy = None
     if args.skills_json:
         manifest = json.loads(Path(args.skills_json).read_text(encoding="utf-8"))
+        problems = validate_manifest(manifest)
+        for problem in problems:
+            print(f"manifest: {problem}", file=sys.stderr)
+        if any(not problem.startswith("warning:") for problem in problems):
+            return 2
         sources.extend(manifest.get("sources", []))
         manifest_taxonomy = manifest.get("taxonomy")
         if manifest.get("field") and not args.field:
             args.field = manifest["field"]
+    if not args.field:
+        parser.error("--field is required (or a \"field\" in the manifest)")
     for skill_dir in args.skill_dir:
         sources.append(parse_skill_dir(Path(skill_dir)))
     if not sources:
@@ -197,6 +227,15 @@ def main(argv=None) -> int:
     print(f"Master skill '{summary['field']}' v{summary['version']}: "
           f"{summary['concept_count']} concepts, "
           f"{summary['contested_count']} contested -> {summary['path']}")
+    if summary.get("unresolved_relations"):
+        print(f"  {summary['unresolved_relations']} relation(s) not resolved "
+              "(see unresolved_relations in master.json)")
+    if summary.get("kept_manual_notes"):
+        print(f"  kept {len(summary['kept_manual_notes'])} hand-added note(s): "
+              f"{', '.join(summary['kept_manual_notes'])}")
+    if summary.get("hand_edited_needing_review"):
+        print("  REVIEW: hand-edited note(s) kept although their sources changed: "
+              f"{', '.join(summary['hand_edited_needing_review'])}")
     return 0
 
 

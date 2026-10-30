@@ -2239,6 +2239,12 @@ def test_ebooklib_spine_order_without_optional_dependencies(monkeypatch):
         def __init__(self, content, _parser):
             self.content = content
 
+        def __call__(self, _names):
+            return []  # no script/style/head elements to drop
+
+        def find_all(self, _names):
+            return []  # no block tags: text comes back as written
+
         def get_text(self, separator="\n"):
             return self.content
 

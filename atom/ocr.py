@@ -656,9 +656,103 @@ def describe_with_vision(image_bytes: bytes) -> str | None:
         except OSError:
             pass
     if result.returncode != 0:
+        detail = (result.stderr or "").strip().splitlines()[-1:] or [""]
+        _warn(f"vision command exited {result.returncode}; figure left "
+              f"undescribed. {detail[0][:200]}")
         return None
     text = result.stdout.strip()
     return text or None
+
+
+def _vision_cache_path(image_bytes: bytes) -> str | None:
+    cmd = os.environ.get(VISION_ENV_VAR, "").strip()
+    cache_dir = default_cache_dir()
+    if not cmd or not cache_dir:
+        return None
+    digest = hashlib.sha256(cmd.encode("utf-8") + b"\0" + image_bytes).hexdigest()
+    return os.path.join(cache_dir, f"vision-{digest}.txt")
+
+
+def describe_with_vision_cached(image_bytes: bytes) -> str | None:
+    """describe_with_vision, cached per (command, image): a re-run over the
+    same PDF does not pay the vision model again for figures it described."""
+    path = _vision_cache_path(image_bytes)
+    if path:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                cached = fh.read().strip()
+                if cached:
+                    return cached
+        except OSError:
+            pass
+    text = describe_with_vision(image_bytes)
+    if text and path:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            os.replace(tmp, path)
+        except OSError:
+            pass
+    return text
+
+
+# A figure smaller than this on both sides is an icon or bullet, not content.
+MIN_FIGURE_SIDE = 48
+# The same image on at least this share of the pages (and on 3 pages or
+# more) is page decoration: a logo, a running header graphic. A diagram
+# reused on a few pages of a long book is still a figure (kept once).
+REPEATED_FIGURE_SHARE = 0.2
+REPEATED_FIGURE_MIN_PAGES = 3
+
+
+def _image_size(data: bytes, meta: dict) -> tuple[int, int]:
+    width, height = int(meta.get("width") or 0), int(meta.get("height") or 0)
+    if width and height:
+        return width, height
+    try:
+        from PIL import Image
+        import io
+        with Image.open(io.BytesIO(data)) as im:
+            return im.width, im.height
+    except Exception:
+        pass
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+        return struct.unpack(">II", data[16:24])
+    return 0, 0
+
+
+def select_figures(images: list[dict]) -> tuple[list[dict], dict]:
+    """Drop decoration before paying for OCR: images repeated on several
+    pages (logos) and tiny ones (icons). Duplicates of a kept figure are
+    dropped too. Returns (kept, counts)."""
+    pages_by_hash: dict[str, set] = {}
+    for img in images:
+        img["_hash"] = hashlib.sha256(img.get("data") or b"").hexdigest()
+        pages_by_hash.setdefault(img["_hash"], set()).add(img.get("page"))
+    total_pages = max((img.get("page") or 0 for img in images), default=0)
+    repeat_floor = max(REPEATED_FIGURE_MIN_PAGES,
+                       int(REPEATED_FIGURE_SHARE * total_pages + 0.999))
+    kept, seen = [], set()
+    counts = {"figures_repeated_skipped": 0, "figures_small_skipped": 0,
+              "figures_duplicate_skipped": 0}
+    for img in images:
+        h = img["_hash"]
+        if len(pages_by_hash[h]) >= repeat_floor:
+            counts["figures_repeated_skipped"] += 1
+            continue
+        w, hgt = _image_size(img.get("data") or b"", img)
+        if w and hgt and w < MIN_FIGURE_SIDE and hgt < MIN_FIGURE_SIDE:
+            counts["figures_small_skipped"] += 1
+            continue
+        if h in seen:
+            counts["figures_duplicate_skipped"] += 1
+            continue
+        seen.add(h)
+        img["width"], img["height"] = w, hgt
+        kept.append(img)
+    return kept, counts
 
 
 def figure_block(page: int, index: int, meta: dict,
@@ -678,23 +772,34 @@ def figure_block(page: int, index: int, meta: dict,
     return "\n".join(lines)
 
 
-def process_pdf_figures(pdf_path: str, lang: str | None = None) -> tuple[str, dict]:
-    """Extract and OCR every embedded figure in a PDF.
+def process_pdf_figures(pdf_path: str, lang: str | None = None,
+                        jobs: int | None = None) -> tuple[str, dict]:
+    """Extract and OCR the embedded figures of a PDF.
 
-    Returns (blocks_text, info) where info counts figures, figures with OCR
-    text, and whether any vision description was used. When no image tool is
-    available, blocks_text is empty and info says why. *lang* None
-    auto-detects, like the page path.
+    Repeated page decoration and tiny icons are skipped first
+    (:func:`select_figures`), the OCR language is resolved once for the
+    whole document, figure OCR runs on a small worker pool, and vision
+    descriptions are cached per image. Returns (blocks_text, info); info
+    counts figures, figures with OCR text, what was skipped, and whether
+    any vision description was used.
     """
-    images = extract_pdf_images(pdf_path)
+    images, skipped = select_figures(extract_pdf_images(pdf_path))
+    resolved = resolve_lang(lang) if images and shutil.which("tesseract") else lang
+    if jobs is None:
+        jobs = min(4, os.cpu_count() or 1)
+    if len(images) > 1 and jobs > 1:
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            ocr_texts = list(pool.map(
+                lambda img: ocr_image_bytes(img["data"], lang=resolved), images))
+    else:
+        ocr_texts = [ocr_image_bytes(img["data"], lang=resolved) for img in images]
     blocks = []
     with_ocr = 0
     vision_used = False
-    for img in images:
-        ocr_text = ocr_image_bytes(img["data"], lang=lang)
+    for img, ocr_text in zip(images, ocr_texts):
         if ocr_text:
             with_ocr += 1
-        vision_text = describe_with_vision(img["data"])
+        vision_text = describe_with_vision_cached(img["data"])
         if vision_text:
             vision_used = True
         blocks.append(figure_block(img["page"], img["index"], img,
@@ -704,5 +809,6 @@ def process_pdf_figures(pdf_path: str, lang: str | None = None) -> tuple[str, di
         "figures_with_ocr": with_ocr,
         "vision_used": vision_used,
         "vision_configured": bool(os.environ.get(VISION_ENV_VAR, "").strip()),
+        **skipped,
     }
     return ("\n\n".join(blocks), info)
