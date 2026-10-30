@@ -80,8 +80,8 @@ git clone https://github.com/jcarus-vn/ATOM.git ~/.claude/skills/atom
 
 ```bash
 # not on PyPI yet - pip takes it from the repository
-pip install "atom[pdf,epub,docx] @ git+https://github.com/jcarus-vn/ATOM.git"
-ATOM /path/to/book.pdf --mode text
+pip install "atom-brain[pdf,epub,docx] @ git+https://github.com/jcarus-vn/ATOM.git"
+atom /path/to/book.pdf --mode text
 ```
 
 ## Learn more

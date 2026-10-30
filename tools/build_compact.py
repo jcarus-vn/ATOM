@@ -14,7 +14,7 @@ stored there, not the notes/*.md re-parse) and writes:
 
 The compact directory is a query artifact: it drops the raw source
 inputs (glossary/patterns items) that live in the per-source skill
-directories. See atom/compact.py for the format contract.
+directories. See atom_brain/compact.py for the format contract.
 
 Usage:
   python3 tools/build_compact.py <legacy_master_dir> <compact_out_dir>
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atom.compact import build_bodies, build_index, compact_master  # noqa: E402
+from atom_brain.compact import build_bodies, build_index, compact_master  # noqa: E402
 
 
 def main() -> int:

@@ -26,7 +26,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.exceptions import ExtractionError  # noqa: E402
+from atom_brain.exceptions import ExtractionError  # noqa: E402
 
 BOOK_A_TEXT = "TEXT OF BOOK A\n"
 
@@ -40,10 +40,10 @@ def calibre_module(monkeypatch, tmp_path):
     the real temp work directory in place.
     """
     monkeypatch.setenv("BOOK_SKILL_WORKDIR", str(tmp_path))
-    import atom.config as config
+    import atom_brain.config as config
 
     importlib.reload(config)
-    import atom.parsers.calibre as calibre
+    import atom_brain.parsers.calibre as calibre
 
     importlib.reload(calibre)
     yield calibre, tmp_path

@@ -9,8 +9,8 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.parsers.rtf import strip_rtf_fallback
-from atom.utils import estimate_tokens, main
+from atom_brain.parsers.rtf import strip_rtf_fallback
+from atom_brain.utils import estimate_tokens, main
 
 
 @pytest.mark.parametrize(
@@ -65,10 +65,10 @@ def test_cli_persists_literal_controls_and_source_metrics(tmp_path, monkeypatch)
     # Exercise the real fallback even if the optional parser is installed.
     monkeypatch.setitem(sys.modules, "striprtf", None)
     monkeypatch.setitem(sys.modules, "striprtf.striprtf", None)
-    monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *args: None)
-    monkeypatch.setattr("atom.utils.OUTPUT_DIR", output_dir)
-    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", output_dir / "full_text.txt")
-    monkeypatch.setattr("atom.utils.OUTPUT_META", output_dir / "metadata.json")
+    monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *args: None)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", output_dir)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", output_dir / "full_text.txt")
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_META", output_dir / "metadata.json")
     monkeypatch.setattr(
         sys, "argv", ["extract.py", str(source), "--install-missing", "no"]
     )

@@ -24,7 +24,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.utils import _structural_chapter_count
+from atom_brain.utils import _structural_chapter_count
 
 # Two real sections in every fixture below, so any count above 2 is a phantom.
 # `___` is deliberately NOT here: "_" is a word character to `\w`, so it is kept

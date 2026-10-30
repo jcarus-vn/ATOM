@@ -1,6 +1,6 @@
 """Structural chapter counts exclude book framing and report their evidence."""
 
-from atom.utils import _structural_chapter_count, detect_structure
+from atom_brain.utils import _structural_chapter_count, detect_structure
 
 
 def _book(chapter_count: int) -> str:

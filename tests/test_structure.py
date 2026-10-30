@@ -8,8 +8,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.master import render_taxonomy_md  # noqa: E402  (before-cost only)
-from atom.structure import (  # noqa: E402
+from atom_brain.master import render_taxonomy_md  # noqa: E402  (before-cost only)
+from atom_brain.structure import (  # noqa: E402
     bound_view_for_source,
     canonical_definition_map,
     coverage_report,
@@ -22,7 +22,7 @@ from atom.structure import (  # noqa: E402
     render_bound_view_md,
     render_slim_taxonomy,
 )
-from atom.utils import estimate_tokens  # noqa: E402
+from atom_brain.utils import estimate_tokens  # noqa: E402
 
 LONG_CITE = ("https://porabook.com/book/slam/ "
              "(https://porabook.com/book/slam/, fetched 2026-10-27) - web "

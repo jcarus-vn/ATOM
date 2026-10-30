@@ -16,7 +16,7 @@ What the loop will NOT do, by construction:
   changed. Data gaps (gold notes missing from the master, facet
   mis-filings) are REPORTED in the log, never repaired by editing
   notes or gold.
-- It never rewrites the shipped ranker defaults in ``atom/master.py``.
+- It never rewrites the shipped ranker defaults in ``atom_brain/master.py``.
   A kept variant becomes the loop's working parameters, stored in
   the state file; promoting it to product defaults is a separate,
   human-approved commit.

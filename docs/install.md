@@ -137,10 +137,18 @@ for that).
 repository:
 
 ```bash
-pip install "atom[pdf,epub,docx] @ git+https://github.com/jcarus-vn/ATOM.git"
-ATOM ~/path/to/book.pdf --mode text  # or: python -m atom ...
+pip install "atom-brain[pdf,epub,docx] @ git+https://github.com/jcarus-vn/ATOM.git"
+atom ~/path/to/book.pdf --mode text  # or: python -m atom_brain ...
 atom --check                          # report which extractors are installed
 ```
+
+> **Package name.** The pip package is `atom-brain` and its Python module is
+> `atom_brain`; the command is still `atom`. Earlier versions were published as
+> `atom`, which is also the name of an unrelated PyPI library (nucleic/atom,
+> used by Enaml), so the two overwrote each other. If you installed the old
+> name, check `pip show atom`: if its summary is "Convert books and documents
+> into structured, on-demand agent skills", run `pip uninstall atom` before
+> installing `atom-brain`. If it shows the other library, leave it alone.
 
 > **`[html]` is heavier than the others.** It pulls in `trafilatura`, which brings a full
 > HTML-processing stack (lxml, a date parser, a timezone database, a URL classifier — 17

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from atom.config import PYTHON_DEPENDENCIES, HTML_EXTENSIONS
+from atom_brain.config import PYTHON_DEPENDENCIES, HTML_EXTENSIONS
 
 
 # Ordered groups for the --check preflight report. Each entry describes one

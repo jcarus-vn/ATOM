@@ -10,7 +10,7 @@ The agent invoking the skill does not set PYTHONDONTWRITEBYTECODE, so the guard
 has to live in the entry points themselves, before the package is imported.
 
 The guard does NOT belong at import time in a library module: a host process
-that merely does `import atom` must not have its global
+that merely does `import atom_brain` must not have its global
 `sys.dont_write_bytecode` flipped underneath it. `if __name__ == "__main__":`
 is false for such an import, which is why the policy is wrapped in it.
 
@@ -54,13 +54,13 @@ ENTRY_POINTS = {
     "tools/eval_taxonomy_lookup.py": "usage: eval_taxonomy_lookup.py [-h]",
     "tools/eval_answer_quality.py": "usage: eval_answer_quality.py [-h]",
     "tools/build_compact.py": "usage: build_compact.py [-h] legacy_dir out_dir",
-    "atom/cli.py": "atom · turns a document into a structured agent skill",
+    "atom_brain/cli.py": "atom · turns a document into a structured agent skill",
 }
 
 # Everything the four entry points import. Copied into the isolated deployment
-# so the runs under test resolve `atom` to the copy, not to the
+# so the runs under test resolve `atom_brain` to the copy, not to the
 # developer's checkout.
-PAYLOAD = ("atom", "scripts", "tools")
+PAYLOAD = ("atom_brain", "scripts", "tools")
 
 # The exact marker the policy must sit inside.
 MAIN_GUARD = 'if __name__ == "__main__":'
@@ -184,7 +184,7 @@ def test_entry_points_set_the_policy_before_importing_the_package():
         import_at = next(
             i
             for i, line in enumerate(lines)
-            if line.lstrip().startswith(("from atom", "import atom"))
+            if line.lstrip().startswith(("from atom", "import atom_brain"))
         )
         assert "sys.dont_write_bytecode = True" in "\n".join(lines[guard_at:import_at]), (
             f"{entry} must set sys.dont_write_bytecode inside its `__main__` "
@@ -203,7 +203,7 @@ def test_entry_point_list_still_matches_the_source_tree():
         except OSError:
             continue
         imports_package = any(
-            line.lstrip().startswith(("from atom", "import atom"))
+            line.lstrip().startswith(("from atom", "import atom_brain"))
             for line in lines
         )
         if not imports_package:
@@ -216,8 +216,8 @@ def test_entry_point_list_still_matches_the_source_tree():
 
     # `__main__.py`/`__init__.py` cannot be guarded from inside the package:
     # Python compiles them before any of our code runs. They are excluded here
-    # and instead SKILL.md must never invoke `python -m atom`.
-    found -= {"atom/__main__.py", "atom/__init__.py"}
+    # and instead SKILL.md must never invoke `python -m atom_brain`.
+    found -= {"atom_brain/__main__.py", "atom_brain/__init__.py"}
 
     assert found == set(ENTRY_POINTS), (
         "entry points changed; update ENTRY_POINTS and make sure every one sets "
@@ -242,9 +242,9 @@ def test_importing_the_library_does_not_mutate_the_embedding_process(deployed):
             (
                 "import sys\n"
                 "sys.dont_write_bytecode = False\n"
-                "import atom, atom.utils, atom.cli\n"
-                f"assert atom.__file__.startswith({str(deployed)!r}), "
-                "atom.__file__\n"
+                "import atom_brain, atom_brain.utils, atom_brain.cli\n"
+                f"assert atom_brain.__file__.startswith({str(deployed)!r}), "
+                "atom_brain.__file__\n"
                 "print(sys.dont_write_bytecode)\n"
             ),
         ],

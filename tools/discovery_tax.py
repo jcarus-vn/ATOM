@@ -38,7 +38,7 @@ import sys
 # otherwise write __pycache__/*.pyc beside the sources, leaving build artifacts
 # inside the skill. `__name__` is bound before the module body runs, so this
 # holds for a direct invocation and never mutates an embedding process that
-# merely imports this module. Must be set BEFORE `atom` is imported.
+# merely imports this module. Must be set BEFORE `atom_brain` is imported.
 if __name__ == "__main__":
     sys.dont_write_bytecode = True
 from pathlib import Path
@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Reuse the extractor's ToC detection too (multilingual + CJK), so discovery_tax
 # and the pipeline agree on what a ToC is — the stale local regex here only
 # matched EN/ES/PT and silently missed FR/DE/IT/NL/CJK books.
-from atom.utils import (  # noqa: E402
+from atom_brain.utils import (  # noqa: E402
     _chapter_number as chapter_number,
     _TOC_PATTERN as toc_pattern,
 )

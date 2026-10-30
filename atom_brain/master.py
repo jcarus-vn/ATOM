@@ -154,7 +154,7 @@ def citation_for(source: dict, chapter: str | None = None,
     """One traceable citation string for a source (+ chapter/page)."""
     name = source.get("name", "unknown source")
     if source.get("kind") == "web":
-        from atom.web_input import web_citation
+        from atom_brain.web_input import web_citation
         cite = web_citation(source)
     else:
         cite = name
@@ -1138,7 +1138,7 @@ def render_skill_md(field: str, notes: list[dict], conflicts: list[dict],
     ]
     for src in sources:
         if src.get("kind") == "web":
-            from atom.web_input import web_citation
+            from atom_brain.web_input import web_citation
             lines.append(f"- {web_citation(src)}")
         else:
             lines.append(f"- {src.get('name', '')} (book)")

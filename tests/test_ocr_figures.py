@@ -11,7 +11,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom import ocr as ocr_module
+from atom_brain import ocr as ocr_module
 
 
 class TestFigureBlocks:

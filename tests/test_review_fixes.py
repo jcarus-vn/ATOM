@@ -17,11 +17,11 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-import atom.master as master  # noqa: E402
-from atom import ocr, web_input  # noqa: E402
-from atom.chapter_detection import detect_chapters  # noqa: E402
-from atom.exceptions import ExtractionError  # noqa: E402
-from atom.master import (  # noqa: E402
+import atom_brain.master as master  # noqa: E402
+from atom_brain import ocr, web_input  # noqa: E402
+from atom_brain.chapter_detection import detect_chapters  # noqa: E402
+from atom_brain.exceptions import ExtractionError  # noqa: E402
+from atom_brain.master import (  # noqa: E402
     build_master,
     load_master,
     merge_sources,
@@ -31,8 +31,8 @@ from atom.master import (  # noqa: E402
     slugify,
     validate_manifest,
 )
-from atom.parsers.docx import validate_docx_xml_safety  # noqa: E402
-from atom.utils import detect_structure  # noqa: E402
+from atom_brain.parsers.docx import validate_docx_xml_safety  # noqa: E402
+from atom_brain.utils import detect_structure  # noqa: E402
 
 BODY = ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 12).strip()
 
@@ -303,7 +303,7 @@ def test_b9_logo_repeated_on_every_page_and_tiny_icons_are_skipped():
 # --- B10: decompression bombs ---------------------------------------------------
 
 def test_b10_highly_compressed_docx_is_refused_before_parsing(tmp_path, monkeypatch):
-    from atom.parsers import zip_limits
+    from atom_brain.parsers import zip_limits
     monkeypatch.setattr(zip_limits, "MAX_MEMBER_UNCOMPRESSED", 1024 * 1024)
     path = tmp_path / "bomb.docx"
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -343,7 +343,7 @@ def test_b12_off_topic_question_says_the_master_has_no_answer(tmp_path):
 
 
 def test_b13_install_missing_does_not_swallow_the_input_path(tmp_path):
-    from atom.utils import parse_arguments
+    from atom_brain.utils import parse_arguments
     paths, _mode, install = parse_arguments(["x", "--install-missing", "book.md"])
     assert paths == ["book.md"] and install == "yes"
     paths, _mode, install = parse_arguments(["x", "--install-missing", "no", "book.md"])
@@ -366,7 +366,7 @@ def test_b13_manifest_field_is_used_and_bad_keys_are_reported(tmp_path):
 
 def test_b14_inline_tags_do_not_split_sentences():
     bs4 = pytest.importorskip("bs4")
-    from atom.parsers.html import soup_text
+    from atom_brain.parsers.html import soup_text
     soup = bs4.BeautifulSoup("<h2>Chapter 1: Intro</h2><p>The <em>Kalman filter</em> "
                              "is <b>optimal</b>.</p>", "html.parser")
     assert soup_text(soup) == "Chapter 1: Intro\nThe Kalman filter is optimal."

@@ -1,12 +1,12 @@
 """Structure optimization for ATOM master skills.
 
-This module is intentionally read-only toward :mod:`atom.master`: it
+This module is intentionally read-only toward :mod:`atom_brain.master`: it
 imports only the stable title helpers (``normalize_title``,
 ``slugify``) and operates on plain note dicts (the shape ``master.json``
 stores: id, title, kind, status, facets, sources, source_keys,
 definitions, body, links), so it keeps working while the retrieval path
-in ``atom.master`` is being reworked in parallel. No function in
-``atom.master`` is modified by this module.
+in ``atom_brain.master`` is being reworked in parallel. No function in
+``atom_brain.master`` is modified by this module.
 
 It implements five structure rules:
 
@@ -31,8 +31,8 @@ from __future__ import annotations
 
 import re
 
-from atom.master import normalize_title as norm_title
-from atom.master import slugify as _slug
+from atom_brain.master import normalize_title as norm_title
+from atom_brain.master import slugify as _slug
 
 __all__ = [
     "bound_view_for_source",
@@ -50,7 +50,7 @@ __all__ = [
     "slim_index_text",
 ]
 
-# ``norm_title`` and ``_slug`` are imported from atom.master above
+# ``norm_title`` and ``_slug`` are imported from atom_brain.master above
 # (single source of truth for title normalization and slugs).
 
 

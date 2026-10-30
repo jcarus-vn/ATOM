@@ -4,8 +4,8 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from atom import utils
-from atom.parsers.pdf import extract_with_docling
+from atom_brain import utils
+from atom_brain.parsers.pdf import extract_with_docling
 
 
 def test_docling_runtime_error_reaches_the_fallback(monkeypatch):

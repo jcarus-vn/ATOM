@@ -7,8 +7,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from atom.config import OUTPUT_DIR
-from atom.exceptions import ExtractionError
+from atom_brain.config import OUTPUT_DIR
+from atom_brain.exceptions import ExtractionError
 
 
 def extract_with_ebook_convert(input_path: str) -> str | None:

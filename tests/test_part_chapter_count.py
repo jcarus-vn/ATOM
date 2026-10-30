@@ -2,7 +2,7 @@
 
 import pytest
 
-from atom.utils import detect_structure
+from atom_brain.utils import detect_structure
 
 
 @pytest.mark.parametrize("marker", ["#", "="])

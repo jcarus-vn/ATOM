@@ -11,7 +11,7 @@ import sys
 # otherwise write __pycache__/*.pyc beside the sources, leaving build artifacts
 # inside the skill. `__name__` is bound before the module body runs, so this
 # holds for a direct invocation and never mutates an embedding process that
-# merely imports this module. Must be set BEFORE `atom` is imported.
+# merely imports this module. Must be set BEFORE `atom_brain` is imported.
 if __name__ == "__main__":
     sys.dont_write_bytecode = True
 
@@ -24,11 +24,11 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, ValueError):
         pass
 
-# Ensure the project root directory (where the 'atom' package lives) is in sys.path
+# Ensure the project root directory (where the 'atom_brain' package lives) is in sys.path
 # so the modular package can be imported reliably regardless of the working directory.
 sys.path.insert(0, str(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from atom.cli import main
+from atom_brain.cli import main
 
 if __name__ == "__main__":
     main()

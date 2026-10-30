@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from atom.exceptions import ExtractionError
+from atom_brain.exceptions import ExtractionError
 
 _MIN_NATIVE_CONFIDENCE = 0.90
 _INSPECTIONS: dict[str, dict[str, Any]] = {}
@@ -151,7 +151,7 @@ def _result_from_inspector(
         # namespace: existing tests pass a minimal SimpleNamespace as
         # utils_module, and hashing is a pure function of the file on disk —
         # it must not depend on which utils object the hook was installed with.
-        from atom.utils import _sha256_file
+        from atom_brain.utils import _sha256_file
         file_sha256 = _sha256_file(str(input_path))
     except OSError as exc:
         raise ExtractionError(
@@ -206,7 +206,7 @@ def install_pdf_inspector_hook(utils_module: Any | None = None) -> None:
     existing Docling/pdftotext/pypdf/pdfminer implementation unchanged.
     """
     if utils_module is None:
-        from atom import utils as utils_module
+        from atom_brain import utils as utils_module
 
     original = utils_module.extract_single_file
     if getattr(original, "_atom_pdf_inspector_hook", False):
@@ -248,7 +248,7 @@ def enrich_pdf_inspector_metadata(metadata_path: str | Path | None = None) -> No
         return
 
     if metadata_path is None:
-        from atom.config import OUTPUT_META
+        from atom_brain.config import OUTPUT_META
 
         metadata_path = OUTPUT_META
 

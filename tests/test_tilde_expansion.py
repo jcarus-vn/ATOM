@@ -15,7 +15,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.utils import resolve_input_files  # noqa: E402
+from atom_brain.utils import resolve_input_files  # noqa: E402
 
 
 @pytest.fixture

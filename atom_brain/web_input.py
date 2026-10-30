@@ -28,7 +28,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-from atom.parsers.html import extract_html_content
+from atom_brain.parsers.html import extract_html_content
 
 USER_AGENT = "atom/1.4 (+local fetch, no login, no paywall bypass)"
 TIMEOUT_SECONDS = 30
@@ -147,7 +147,7 @@ class _MainContentParser(html.parser.HTMLParser):
 def strip_boilerplate_all(raw_html: str) -> str:
     """All visible text (script/style removed), to judge how much the
     main-content pass dropped."""
-    from atom.parsers.html import _HTMLTextExtractor
+    from atom_brain.parsers.html import _HTMLTextExtractor
     parser = _HTMLTextExtractor()
     try:
         parser.feed(raw_html)

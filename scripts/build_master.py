@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atom.master import (  # noqa: E402
+from atom_brain.master import (  # noqa: E402
     validate_manifest,
     bound_view,
     build_master,
@@ -43,7 +43,7 @@ from atom.master import (  # noqa: E402
     rank_notes,
     suggest_related,
 )
-from atom.compact import (  # noqa: E402
+from atom_brain.compact import (  # noqa: E402
     expand_compact_master,
     load_compact_dir,
     query_compact_dir,
