@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import zipfile
 import sys
-from atom.exceptions import ExtractionError
-from atom.parsers.zip_limits import check_zip_limits
+from atom_brain.exceptions import ExtractionError
+from atom_brain.parsers.zip_limits import check_zip_limits
 
 
 def extract_docx_with_python_docx(docx_path: str) -> str | None:

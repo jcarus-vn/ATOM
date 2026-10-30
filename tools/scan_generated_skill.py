@@ -12,7 +12,7 @@ import sys
 # otherwise write __pycache__/*.pyc beside the sources, leaving build artifacts
 # inside the skill. `__name__` is bound before the module body runs, so this
 # holds for a direct invocation and never mutates an embedding process that
-# merely imports this module. Must be set BEFORE `atom` is imported.
+# merely imports this module. Must be set BEFORE `atom_brain` is imported.
 if __name__ == "__main__":
     sys.dont_write_bytecode = True
 from dataclasses import dataclass
@@ -30,7 +30,7 @@ SUPPORTING_FILENAMES = ("glossary.md", "patterns.md", "cheatsheet.md")
 # extractor did not strip U+2060 while this scanner flagged it, so a generated
 # skill was warned about a character extraction was meant to have removed.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from atom.sanitize import is_invisible_codepoint  # noqa: E402
+from atom_brain.sanitize import is_invisible_codepoint  # noqa: E402
 
 _CONTENT_RULES = (
     (

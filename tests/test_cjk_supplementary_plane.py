@@ -19,8 +19,8 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.config import CJK_CHARS_PER_TOKEN
-from atom.utils import estimate_tokens
+from atom_brain.config import CJK_CHARS_PER_TOKEN
+from atom_brain.utils import estimate_tokens
 
 BMP = "一二三四五六七八九十"                                    # common ideographs
 SIP = "\U00020000\U00020001\U0002a700\U0002b740\U0002ceb0"   # Ext B / C / D / E

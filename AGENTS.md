@@ -6,7 +6,7 @@ This file is the repository-wide execution contract for coding agents.
 
 `ATOM` converts books and documents into structured, on-demand Agent Skills. The repository has two distinct halves:
 
-1. a deterministic Python extractor (`scripts/extract.py` -> `atom/`), and
+1. a deterministic Python extractor (`scripts/extract.py` -> `atom_brain/`), and
 2. a spec-driven generator (`SKILL.md`) executed by an agent.
 
 Do not blur those responsibilities without a measured reason.

@@ -14,9 +14,9 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from atom.exceptions import ExtractionError
+from atom_brain.exceptions import ExtractionError
 
-from atom.config import (
+from atom_brain.config import (
     OUTPUT_DIR,
     OUTPUT_TEXT,
     OUTPUT_META,
@@ -29,18 +29,18 @@ from atom.config import (
     CALIBRE_EBOOK_EXTENSIONS,
     supported_formats_message,
 )
-from atom.dependencies import (
+from atom_brain.dependencies import (
     INSTALL_MODE_WORDS,
     normalize_install_mode,
     prepare_dependencies,
     run_dependency_check,
 )
-from atom.parsers.text import read_text_file
-from atom.parsers.html import extract_html_file
-from atom.parsers.docx import extract_docx
-from atom.parsers.rtf import extract_rtf
-from atom.parsers.calibre import extract_with_ebook_convert
-from atom.parsers.pdf import (
+from atom_brain.parsers.text import read_text_file
+from atom_brain.parsers.html import extract_html_file
+from atom_brain.parsers.docx import extract_docx
+from atom_brain.parsers.rtf import extract_rtf
+from atom_brain.parsers.calibre import extract_with_ebook_convert
+from atom_brain.parsers.pdf import (
     extract_with_docling,
     extract_with_pdftotext_detail,
     extract_with_pypdf,
@@ -48,16 +48,16 @@ from atom.parsers.pdf import (
     looks_image_only,
     count_pages,
 )
-from atom.parsers.epub import (
+from atom_brain.parsers.epub import (
     extract_with_ebooklib,
     extract_with_zipfile,
     count_epub_chapters,
     count_epub_images,
 )
-from atom.sanitize import sanitize_extracted_text
-from atom.chapter_detection import detect_chapters
-from atom import ocr as ocr_module
-from atom.web_input import (
+from atom_brain.sanitize import sanitize_extracted_text
+from atom_brain.chapter_detection import detect_chapters
+from atom_brain import ocr as ocr_module
+from atom_brain.web_input import (
     fetch_web_source,
     is_url,
     read_urls_file,
@@ -991,7 +991,7 @@ def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
     while a heading on its own line still is. (Issue #237)
 
     `chapter_mode` selects the flexible detector in
-    `atom.chapter_detection` (auto/explicit/toc/heuristic) whose
+    `atom_brain.chapter_detection` (auto/explicit/toc/heuristic) whose
     per-chapter detail is attached as `chapter_details`. When the legacy
     count finds fewer than two chapters but the flexible detector finds at
     least two, the flexible count wins and `chapters_method` becomes
@@ -1066,7 +1066,7 @@ def detect_structure(text: str, chapter_mode: str = "auto") -> dict:
     # Look for ToC indicators in the first ~30k chars (multilingual; see _TOC_PATTERN)
     has_toc = bool(_TOC_PATTERN.search(text[:30000]))
 
-    # Flexible chapter detail (see atom.chapter_detection). The
+    # Flexible chapter detail (see atom_brain.chapter_detection). The
     # legacy count above stays authoritative except when it finds fewer
     # than two chapters and the flexible detector finds at least two: the
     # legacy detector cannot see bare-title or ToC-anchored chapters.

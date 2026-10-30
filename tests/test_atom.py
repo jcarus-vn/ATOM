@@ -23,8 +23,8 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.exceptions import ExtractionError
-from atom.utils import (
+from atom_brain.exceptions import ExtractionError
+from atom_brain.utils import (
     resolve_input_files,
     extract_single_file,
     parse_arguments,
@@ -33,12 +33,12 @@ from atom.utils import (
     _cn_numeral_to_int,
     main,
 )
-from atom.config import SUPPORTED_EXTENSIONS
-from atom.parsers import pdf as pdf_parser
-from atom.parsers.text import read_text_file
-from atom.parsers.docx import extract_docx_with_zipfile
-from atom.parsers.rtf import strip_rtf_fallback
-from atom.parsers.epub import count_epub_chapters, extract_with_zipfile
+from atom_brain.config import SUPPORTED_EXTENSIONS
+from atom_brain.parsers import pdf as pdf_parser
+from atom_brain.parsers.text import read_text_file
+from atom_brain.parsers.docx import extract_docx_with_zipfile
+from atom_brain.parsers.rtf import strip_rtf_fallback
+from atom_brain.parsers.epub import count_epub_chapters, extract_with_zipfile
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -180,7 +180,7 @@ class TestEpubExtractionFix:
 
     def test_epub_extract_with_ebooklib_returns_str_or_none(self):
         """extract_with_ebooklib returns str|None, NOT a tuple."""
-        from atom.parsers.epub import extract_with_ebooklib
+        from atom_brain.parsers.epub import extract_with_ebooklib
 
         # With ebooklib likely not installed in test env → returns None
         result = extract_with_ebooklib("nonexistent.epub")
@@ -193,7 +193,7 @@ class TestEpubExtractionFix:
         epub_path = _make_minimal_epub(tmp_path / "test.epub")
 
         # Mock prepare_dependencies to be a no-op
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             result = extract_single_file(epub_path, "text", "no")
 
         assert result["format"] == "epub"
@@ -207,7 +207,7 @@ class TestEpubExtractionFix:
         epub_path = _make_minimal_epub(tmp_path / "test.epub")
 
         # Even if ebooklib is absent, this should NOT raise TypeError/ValueError
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             try:
                 result = extract_single_file(epub_path, "text", "no")
             except (TypeError, ValueError) as exc:
@@ -225,7 +225,7 @@ class TestEpubOpfRelativePaths:
 
     def test_zipfile_fallback_resolves_oebps_paths(self, tmp_path):
         """The core bug: hrefs in OPF are relative to OPF dir, not archive root."""
-        from atom.parsers.epub import extract_with_zipfile
+        from atom_brain.parsers.epub import extract_with_zipfile
 
         epub_path = _make_oebps_epub(tmp_path / "oebps.epub")
         text = extract_with_zipfile(str(epub_path))
@@ -238,7 +238,7 @@ class TestEpubOpfRelativePaths:
         """End-to-end: extract_single_file should succeed with OEBPS layout."""
         epub_path = _make_oebps_epub(tmp_path / "test_oebps.epub")
 
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             result = extract_single_file(epub_path, "text", "no")
 
         assert result["format"] == "epub"
@@ -248,7 +248,7 @@ class TestEpubOpfRelativePaths:
 
     def test_container_xml_locates_opf(self, tmp_path):
         """_find_opf_path should prefer META-INF/container.xml over globbing."""
-        from atom.parsers.epub import _find_opf_path
+        from atom_brain.parsers.epub import _find_opf_path
 
         epub_path = _make_oebps_epub(tmp_path / "container.epub")
         with zipfile.ZipFile(epub_path) as zf:
@@ -258,7 +258,7 @@ class TestEpubOpfRelativePaths:
 
     def test_count_chapters_with_oebps(self, tmp_path):
         """count_epub_chapters should work with OPF in subdirectory."""
-        from atom.parsers.epub import count_epub_chapters
+        from atom_brain.parsers.epub import count_epub_chapters
 
         epub_path = _make_oebps_epub(tmp_path / "chapters.epub")
         count = count_epub_chapters(str(epub_path))
@@ -266,7 +266,7 @@ class TestEpubOpfRelativePaths:
 
     def test_root_level_opf_still_works(self, tmp_path):
         """Regression check: root-level OPF (no subdirectory) should still work."""
-        from atom.parsers.epub import extract_with_zipfile
+        from atom_brain.parsers.epub import extract_with_zipfile
 
         epub_path = _make_minimal_epub(tmp_path / "root_opf.epub")
         text = extract_with_zipfile(str(epub_path))
@@ -308,7 +308,7 @@ class TestBatchResilience:
 
         for fp in input_files:
             try:
-                with mock.patch("atom.utils.prepare_dependencies"):
+                with mock.patch("atom_brain.utils.prepare_dependencies"):
                     res = extract_single_file(fp, "text", "no")
                 extracted.append(res)
             except ExtractionError as exc:
@@ -327,7 +327,7 @@ class TestBatchResilience:
             "sys.argv",
             ["extract.py", str(bad1), str(bad2), "--install-missing", "no"],
         )
-        monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *a: None)
+        monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *a: None)
 
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -351,10 +351,10 @@ class TestBatchResilience:
         # So we patch the OUTPUT_* in utils directly
         out_text = out_dir / "full_text.txt"
         out_meta = out_dir / "metadata.json"
-        monkeypatch.setattr("atom.utils.OUTPUT_DIR", out_dir)
-        monkeypatch.setattr("atom.utils.OUTPUT_TEXT", out_text)
-        monkeypatch.setattr("atom.utils.OUTPUT_META", out_meta)
-        monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *a: None)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", out_dir)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", out_text)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_META", out_meta)
+        monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *a: None)
 
         main()
 
@@ -394,12 +394,12 @@ class TestBatchResilience:
             return result
 
         monkeypatch.setattr("sys.argv", ["extract.py", str(source), "--install-missing", "no"])
-        monkeypatch.setattr("atom.utils.OUTPUT_DIR", out_dir)
-        monkeypatch.setattr("atom.utils.OUTPUT_TEXT", out_text)
-        monkeypatch.setattr("atom.utils.OUTPUT_META", out_meta)
-        monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *a: None)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", out_dir)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", out_text)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_META", out_meta)
+        monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *a: None)
         monkeypatch.setattr(
-            "atom.utils.extract_single_file", extract_with_reported_source
+            "atom_brain.utils.extract_single_file", extract_with_reported_source
         )
 
         main()
@@ -622,7 +622,7 @@ class TestDetectStructure:
     def test_thai_prose_is_not_a_chapter_heading(self):
         """`บทความ` (article) and `ตอนนี้` (now) start with the chapter words
         but are ordinary prose — they must not be treated as headings."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("บทความนี้ยาวมากและมีรายละเอียดเยอะ") is None
         assert _chapter_number("ตอนนี้เรามาดูกันว่าเกิดอะไรขึ้น") is None
@@ -643,7 +643,7 @@ class TestDetectStructure:
 
     def test_hindi_prose_is_not_a_chapter_heading(self):
         """`अध्याय` used in prose (no number, or not at the start) is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("इस अध्याय में हम चर्चा करेंगे") is None
         assert _chapter_number("अध्याय") is None
@@ -663,7 +663,7 @@ class TestDetectStructure:
 
     def test_bengali_prose_is_not_a_chapter_heading(self):
         """`অধ্যায়` used in prose (no number, or not at the start) is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("এই অধ্যায়ে আমরা আলোচনা করব") is None
         assert _chapter_number("অধ্যায়") is None
@@ -683,14 +683,14 @@ class TestDetectStructure:
 
     def test_odia_prose_is_not_a_chapter_heading(self):
         """An inflected form (ଅଧ୍ୟାୟରେ) or a bare word is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ଏହି ଅଧ୍ୟାୟରେ ଆମେ ଆଲୋଚନା କରିବା") is None
         assert _chapter_number("ଅଧ୍ୟାୟ") is None
 
     def test_odia_does_not_collide_with_bengali(self):
         """Odia ଅଧ୍ୟାୟ (U+0B05…) and Bengali অধ্যায় (U+0985…) are distinct."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ଅଧ୍ୟାୟ ୫") == 5
         assert _chapter_number("অধ্যায় ৫") == 5
@@ -710,7 +710,7 @@ class TestDetectStructure:
 
     def test_tamil_prose_is_not_a_chapter_heading(self):
         """An inflected form (அத்தியாயத்தில்) or a bare word is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("இந்த அத்தியாயத்தில் நாம் பார்ப்போம்") is None
         assert _chapter_number("அத்தியாயம்") is None
@@ -730,7 +730,7 @@ class TestDetectStructure:
 
     def test_sinhala_prose_is_not_a_chapter_heading(self):
         """Inflected forms (පරිච්ඡේදයේ / පරිච්ඡේදයක්) and the bare word are not headings."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("මෙම පරිච්ඡේදයේ අපි සාකච්ඡා කරමු") is None
         assert _chapter_number("තවත් පරිච්ඡේදයක් ඇත") is None
@@ -751,7 +751,7 @@ class TestDetectStructure:
 
     def test_telugu_prose_is_not_a_chapter_heading(self):
         """An inflected form (అధ్యాయంలో) or a bare word is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ఈ అధ్యాయంలో మనం చర్చిస్తాము") is None
         assert _chapter_number("అధ్యాయం") is None
@@ -771,7 +771,7 @@ class TestDetectStructure:
 
     def test_kannada_prose_is_not_a_chapter_heading(self):
         """An inflected form (ಅಧ್ಯಾಯದಲ್ಲಿ) or a bare word is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ಈ ಅಧ್ಯಾಯದಲ್ಲಿ ನಾವು ಚರ್ಚಿಸುತ್ತೇವೆ") is None
         assert _chapter_number("ಅಧ್ಯಾಯ") is None
@@ -791,7 +791,7 @@ class TestDetectStructure:
 
     def test_malayalam_prose_is_not_a_chapter_heading(self):
         """An inflected form (അധ്യായത്തിൽ) or a bare word is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ഈ അധ്യായത്തിൽ നാം ചർച്ച ചെയ്യുന്നു") is None
         assert _chapter_number("അധ്യായം") is None
@@ -811,7 +811,7 @@ class TestDetectStructure:
 
     def test_gujarati_prose_is_not_a_chapter_heading(self):
         """Inflected forms (પ્રકરણમાં/અધ્યાયમાં) and bare words are not headings."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("આ પ્રકરણમાં આપણે ચર્ચા કરીશું") is None
         assert _chapter_number("આ અધ્યાયમાં આપણે ચર્ચા કરીશું") is None
@@ -833,7 +833,7 @@ class TestDetectStructure:
 
     def test_punjabi_prose_is_not_a_chapter_heading(self):
         """A postposition phrase, an oblique form, or a bare word is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ਇਸ ਕਾਂਡ ਵਿੱਚ ਅਸੀਂ ਚਰਚਾ ਕਰਾਂਗੇ") is None
         assert _chapter_number("ਇਸ ਅਧਿਆਇ ਵਿੱਚ ਅਸੀਂ ਚਰਚਾ ਕਰਾਂਗੇ") is None
@@ -843,7 +843,7 @@ class TestDetectStructure:
 
     def test_punjabi_does_not_collide_with_neighbouring_scripts(self):
         """Gurmukhi (U+0A00–0A7F), Gujarati (U+0A80–0AFF) and Devanagari stay separate."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("ਅਧਿਆਇ ੫") == 5
         assert _chapter_number("અધ્યાય ૫") == 5
@@ -851,7 +851,7 @@ class TestDetectStructure:
 
     def test_gujarati_adhyay_does_not_collide_with_hindi(self):
         """Gujarati અધ્યાય (U+0A85…) and Devanagari अध्याय (U+0905…) are distinct."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("અધ્યાય ૫") == 5
         assert _chapter_number("अध्याय ५") == 5
@@ -871,7 +871,7 @@ class TestDetectStructure:
 
     def test_russian_prose_is_not_a_chapter_heading(self):
         """An inflected form or a different word (Главная) is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("В этой главе мы обсудим") is None
         assert _chapter_number("Главная страница") is None
@@ -892,7 +892,7 @@ class TestDetectStructure:
 
     def test_greek_prose_is_not_a_chapter_heading(self):
         """`κεφάλαιο` used in prose (no number, or mid-sentence) is not a heading."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("Σε αυτό το κεφάλαιο θα δούμε") is None
         assert _chapter_number("Κεφάλαιο") is None
@@ -920,13 +920,13 @@ class TestDetectStructure:
 
     def test_korean_article_is_not_chapter(self):
         """`제N조` (article) is not a chapter classifier — deliberately excluded."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("제56조 (연장·야간 및 휴일 근로)") is None
 
     def test_korean_prose_cross_reference_not_chapter(self):
         """Prose cross-references with particles are not headings."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("이 장과 제5장에서 정한 근로시간…") is None
         assert _chapter_number("제5장에서 정한 근로시간에 관한 규정은…") is None
@@ -956,7 +956,7 @@ class TestDetectStructure:
 
     def test_persian_digit_scripts(self):
         """`فصل N` with Persian, Arabic-Indic, and ASCII digits."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("فصل ۱") == 1
         assert _chapter_number("فصل ١") == 1
@@ -968,7 +968,7 @@ class TestDetectStructure:
 
     def test_persian_word_numerals_1_to_34(self):
         """Word ordinals `اول` … `سی و چهارم` map to integers 1–34."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         for n, word in enumerate(self._FA_ORDINAL_1_TO_34, 1):
             assert _chapter_number(f"فصل {word}") == n, word
@@ -982,8 +982,8 @@ class TestDetectStructure:
         sanitize_extracted_text() keeps it; the heading must resolve to 30
         as sanitized, and also when a source omits the ZWNJ.
         """
-        from atom.sanitize import sanitize_extracted_text
-        from atom.utils import _chapter_number
+        from atom_brain.sanitize import sanitize_extracted_text
+        from atom_brain.utils import _chapter_number
 
         heading = "فصل سی‌ام"
         sanitized, removed = sanitize_extracted_text(heading)
@@ -994,7 +994,7 @@ class TestDetectStructure:
 
     def test_persian_zwnj_chapter_detected_end_to_end(self):
         """A ZWNJ-spelled Persian heading is counted after sanitization."""
-        from atom.sanitize import sanitize_extracted_text
+        from atom_brain.sanitize import sanitize_extracted_text
 
         text = (
             "فصل بیستم مقدمه\nمتن\n"
@@ -1005,7 +1005,7 @@ class TestDetectStructure:
 
     def test_persian_compound_word_numerals(self):
         """Explicit compound forms used in longer Persian books."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("فصل بیست و یکم") == 21
         assert _chapter_number("فصل بیست و نهم") == 29
@@ -1014,7 +1014,7 @@ class TestDetectStructure:
 
     def test_persian_hejdahom_spelling_variants(self):
         """Both common spellings of 18: هجدهم and هیجدهم."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("فصل هجدهم") == 18
         assert _chapter_number("فصل هجدهم: یک جاسوس") == 18
@@ -1023,7 +1023,7 @@ class TestDetectStructure:
 
     def test_persian_bakhsh_section(self):
         """`بخش` (section/part) is accepted with digits or word numerals."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("بخش ۲") == 2
         assert _chapter_number("بخش ٢") == 2
@@ -1033,7 +1033,7 @@ class TestDetectStructure:
 
     def test_persian_titled_headings(self):
         """Punctuation / dash / spaced titles after the numeral are headings."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("فصل ۱: مقدمه") == 1
         assert _chapter_number("فصل اول — مبانی برنامه‌نویسی") == 1
@@ -1043,7 +1043,7 @@ class TestDetectStructure:
 
     def test_persian_markdown_prefix(self):
         """Markdown heading prefixes are stripped by `_chapter_number`."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("## فصل ۱: مقدمه") == 1
         assert _chapter_number("### فصل دوم") == 2
@@ -1056,7 +1056,7 @@ class TestDetectStructure:
         ("اولویت‌ها", "اولیه", "دومینو"), so they require a separator. Longer
         forms are not, and extractors do drop the space after them.
         """
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("فصل سی و چهارمخداحافظ، فرانسه") == 34
         assert _chapter_number("فصل بیست و یکمپایان سفر") == 21
@@ -1069,7 +1069,7 @@ class TestDetectStructure:
 
     def test_persian_short_ordinal_false_positives(self):
         """Ordinary phrases that begin with a short ordinal must not be chapters."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("فصل اولویت‌ها") is None
         assert _chapter_number("فصل اولیه") is None
@@ -1078,7 +1078,7 @@ class TestDetectStructure:
 
     def test_persian_prose_is_not_a_chapter_heading(self):
         """Inline / incomplete `فصل` references must not count as headings."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("در فصل ۲ این موضوع را بررسی می‌کنیم") is None
         assert _chapter_number("در فصل دوم این موضوع را بررسی می‌کنیم") is None
@@ -1112,7 +1112,7 @@ class TestDetectStructure:
 
     def test_roman_footnote_reference_is_not_a_chapter(self):
         """Scholarly cross-references must stay rejected after the Roman change."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("V. § 19, note.") is None
         assert _chapter_number("VI. § 21:\u2014") is None
@@ -1417,7 +1417,7 @@ VIII. CONCLUSIONS
     def test_vietnamese_chuong_not_program(self):
         # "Chương trình" (program) starts with the chapter word but is not a
         # heading — no number follows "Chương", so it must not match.
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("Chương trình 1 của khóa học") is None
 
@@ -1501,7 +1501,7 @@ class TestMarkdownPrefixedLatinChapters:
     inflated chapters_detected."""
 
     def test_md_prefixed_latin_chapter_word(self):
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("## Chapter 1") == 1
         assert _chapter_number("## CHAPTER 5") == 5
@@ -1511,13 +1511,13 @@ class TestMarkdownPrefixedLatinChapters:
         assert _chapter_number("## Kapitel 3") == 3
 
     def test_asciidoc_prefixed_chapter_word(self):
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("== Chapter 1") == 1
         assert _chapter_number("=== Chapter 2") == 2
 
     def test_md_prefixed_roman_numeral(self):
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("## I. Loomings") == 1
         assert _chapter_number("## III: The Spouter-Inn") == 3
@@ -1542,7 +1542,7 @@ class TestMarkdownPrefixedLatinChapters:
         assert detect_structure(text)["chapters_detected"] == 3
 
     def test_md_prefixed_non_chapter_headings_still_rejected(self):
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
 
         assert _chapter_number("## Some Section") is None
         assert _chapter_number("## 5 Setup") is None
@@ -1562,7 +1562,7 @@ class TestTextExtraction:
     def test_extract_txt_file(self, tmp_path):
         txt = _make_text_file(tmp_path / "simple.txt", "Simple text content for testing.")
 
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             result = extract_single_file(txt, "text", "no")
 
         assert result["format"] == "txt"
@@ -1572,7 +1572,7 @@ class TestTextExtraction:
     def test_extract_md_file(self, tmp_path):
         md = _make_md_file(tmp_path / "notes.md", "# My Notes\n\nSome notes here.")
 
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             result = extract_single_file(md, "text", "no")
 
         assert result["format"] == "md"
@@ -1585,7 +1585,7 @@ class TestHtmlExtraction:
     def test_extract_html_file(self, tmp_path):
         html_file = _make_html_file(tmp_path / "page.html")
 
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             result = extract_single_file(html_file, "text", "no")
 
         assert result["format"] == "html"
@@ -1599,7 +1599,7 @@ class TestDocxExtraction:
     def test_extract_docx_python_docx_preserves_document_order(self, tmp_path):
         from types import SimpleNamespace
 
-        from atom.parsers.docx import extract_docx_with_python_docx
+        from atom_brain.parsers.docx import extract_docx_with_python_docx
 
         docx_path = _make_minimal_docx(tmp_path / "interleaved.docx")
         document = mock.Mock()
@@ -1632,7 +1632,7 @@ class TestDocxExtraction:
     def test_extract_docx_zipfile_fallback(self, tmp_path):
         docx = _make_minimal_docx(tmp_path / "test.docx")
 
-        with mock.patch("atom.utils.prepare_dependencies"):
+        with mock.patch("atom_brain.utils.prepare_dependencies"):
             result = extract_single_file(docx, "text", "no")
 
         assert result["format"] == "docx"
@@ -1671,7 +1671,7 @@ class TestDocxExtraction:
         so `docx` is faked importable here to exercise the guard
         deterministically regardless of whether python-docx is actually
         installed in the environment running this test."""
-        from atom.parsers.docx import extract_docx_with_python_docx
+        from atom_brain.parsers.docx import extract_docx_with_python_docx
 
         ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         xml = textwrap.dedent(f"""\
@@ -1699,7 +1699,7 @@ class TestDocxExtraction:
         importable, extract_docx_with_python_docx() must return None (not
         raise, not scan the archive) -- it can't parse anything either way,
         malicious or not, so there's no protection to buy by validating."""
-        from atom.parsers.docx import extract_docx_with_python_docx
+        from atom_brain.parsers.docx import extract_docx_with_python_docx
 
         real_import = __import__
 
@@ -1718,7 +1718,7 @@ class TestDocxExtraction:
 
     def test_extract_docx_xxe_rejection(self, tmp_path):
         """Verify that a DOCX with malicious DTD or entity declarations is rejected."""
-        from atom.parsers.docx import extract_docx
+        from atom_brain.parsers.docx import extract_docx
         
         # Create a malicious DOCX
         ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -1749,7 +1749,7 @@ class TestDocxExtraction:
         double-scan (the whole archive, every .xml/.rels member, decoded
         across five candidate encodings) is exactly what the earlier review
         round asked to remove."""
-        from atom.parsers import docx as docx_module
+        from atom_brain.parsers import docx as docx_module
 
         docx_path = _make_minimal_docx(tmp_path / "test.docx")
 
@@ -1813,10 +1813,10 @@ class TestDependencyCheck:
     """Tests for the --check preflight (run_dependency_check)."""
 
     def test_all_present_reports_ready(self, capsys):
-        from atom.dependencies import run_dependency_check
+        from atom_brain.dependencies import run_dependency_check
 
-        with mock.patch("atom.dependencies.python_module_available", return_value=True), \
-             mock.patch("atom.dependencies.shutil.which", return_value="/usr/bin/tool"):
+        with mock.patch("atom_brain.dependencies.python_module_available", return_value=True), \
+             mock.patch("atom_brain.dependencies.shutil.which", return_value="/usr/bin/tool"):
             code = run_dependency_check()
 
         out = capsys.readouterr().out
@@ -1825,10 +1825,10 @@ class TestDependencyCheck:
         assert "✗" not in out
 
     def test_all_missing_lists_install_commands(self, capsys):
-        from atom.dependencies import run_dependency_check
+        from atom_brain.dependencies import run_dependency_check
 
-        with mock.patch("atom.dependencies.python_module_available", return_value=False), \
-             mock.patch("atom.dependencies.shutil.which", return_value=None):
+        with mock.patch("atom_brain.dependencies.python_module_available", return_value=False), \
+             mock.patch("atom_brain.dependencies.shutil.which", return_value=None):
             code = run_dependency_check()
 
         out = capsys.readouterr().out
@@ -1843,13 +1843,13 @@ class TestDependencyCheck:
 
     def test_pdftotext_alone_satisfies_pdf_text(self, capsys):
         """pdftotext present (system) should mark PDF text-heavy ready even with no python PDF libs."""
-        from atom.dependencies import run_dependency_check
+        from atom_brain.dependencies import run_dependency_check
 
         def which(cmd):
             return "/usr/bin/pdftotext" if cmd == "pdftotext" else None
 
-        with mock.patch("atom.dependencies.python_module_available", return_value=False), \
-             mock.patch("atom.dependencies.shutil.which", side_effect=which):
+        with mock.patch("atom_brain.dependencies.python_module_available", return_value=False), \
+             mock.patch("atom_brain.dependencies.shutil.which", side_effect=which):
             run_dependency_check()
 
         out = capsys.readouterr().out
@@ -1867,7 +1867,7 @@ class TestParserExceptionLogging:
 
     def test_pypdf_warns_on_unexpected_error_and_returns_none(self, tmp_path, capsys):
         """Monkeypatch pypdf import to raise; confirm None + stderr warning."""
-        from atom.parsers.pdf import extract_with_pypdf
+        from atom_brain.parsers.pdf import extract_with_pypdf
 
         broken = tmp_path / "broken.pdf"
         broken.write_bytes(b"%PDF-1.4 fake")
@@ -1935,7 +1935,7 @@ class TestHtmlEntityDecoding:
 
     def _text(self, fragment):
         # Feed a raw fragment (no block tags) through a fresh stdlib parser.
-        from atom.parsers.html import _HTMLTextExtractor
+        from atom_brain.parsers.html import _HTMLTextExtractor
         p = _HTMLTextExtractor()
         p.feed(fragment)
         return p.get_text()
@@ -2201,7 +2201,7 @@ def test_ebooklib_spine_order_without_optional_dependencies(monkeypatch):
     """The preferred parser's spine logic runs in the dependency-free CI matrix."""
     import types
 
-    from atom.parsers.epub import extract_with_ebooklib
+    from atom_brain.parsers.epub import extract_with_ebooklib
 
     item_document = 9
 
@@ -2298,7 +2298,7 @@ class TestEbooklibEpubSpineOrder:
     def test_spine_order_overrides_manifest_order_and_nav_follows(self, tmp_path):
         epub = pytest.importorskip("ebooklib.epub")
         pytest.importorskip("bs4")
-        from atom.parsers.epub import extract_with_ebooklib
+        from atom_brain.parsers.epub import extract_with_ebooklib
 
         book = self._make_book(epub, [])
         book.spine = [book.get_item_with_id("c1"), book.get_item_with_id("c2")]
@@ -2313,7 +2313,7 @@ class TestEbooklibEpubSpineOrder:
     def test_missing_or_repeated_spine_refs_keep_documents_once(self, monkeypatch):
         epub = pytest.importorskip("ebooklib.epub")
         pytest.importorskip("bs4")
-        from atom.parsers.epub import extract_with_ebooklib
+        from atom_brain.parsers.epub import extract_with_ebooklib
 
         book = self._make_book(epub, [("c1", "yes"), ("missing", "yes"), ("c1", "yes")])
         monkeypatch.setattr(epub, "read_epub", lambda _path: book)
@@ -2470,7 +2470,7 @@ class TestLooksImageOnly:
         assert pdf_parser.looks_image_only("scan.pdf") is False
 
     def test_extraction_fails_early_with_ocr_hint(self, monkeypatch, tmp_path):
-        from atom import utils
+        from atom_brain import utils
 
         pdf = tmp_path / "scan.pdf"
         pdf.write_bytes(b"%PDF-1.4\n")
@@ -2542,7 +2542,7 @@ class TestLowercaseRomanNumerals:
 
     def test_bare_lowercase_not_confused_with_prose(self):
         """Lowercase roman 'i' alone or 'v.' page dividers are not chapters."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
         assert _chapter_number("i") is None
         assert _chapter_number("v.") is None
         assert _chapter_number("i.") is None
@@ -2570,7 +2570,7 @@ class TestLowercaseRomanNumerals:
     def test_roman_word_false_positives_in_markdown_heading(self):
         """Even in markdown headings, short lowercase-Roman words that are
         real words ('vi', 'cli') should be validated via round-trip."""
-        from atom.utils import _chapter_number
+        from atom_brain.utils import _chapter_number
         assert _chapter_number("## vi: the editor") is not None  # legitimate Roman
         assert _chapter_number("## vi. editor") is not None
 

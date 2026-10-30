@@ -20,8 +20,8 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-import atom.utils as utils  # noqa: E402
-from atom.exceptions import ExtractionError  # noqa: E402
+import atom_brain.utils as utils  # noqa: E402
+from atom_brain.exceptions import ExtractionError  # noqa: E402
 
 
 def _make_unreadable(path: Path) -> Path:
@@ -60,7 +60,7 @@ def test_batch_survives_unreadable_source(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("BOOK_SKILL_WORKDIR", str(workdir))
     # config caches OUTPUT_* at import time; point the module constants at the
     # temp workdir so the run does not touch the shared default.
-    import atom.config as config
+    import atom_brain.config as config
     for module in (config, utils):
         monkeypatch.setattr(module, "OUTPUT_DIR", workdir, raising=False)
         monkeypatch.setattr(module, "OUTPUT_TEXT", workdir / "full_text.txt", raising=False)
@@ -130,7 +130,7 @@ def test_batch_survives_post_extraction_stat_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(os.path, "getsize", flaky_getsize)
 
     workdir = tmp_path / "work"
-    import atom.config as config
+    import atom_brain.config as config
     for module in (config, utils):
         monkeypatch.setattr(module, "OUTPUT_DIR", workdir, raising=False)
         monkeypatch.setattr(module, "OUTPUT_TEXT", workdir / "full_text.txt", raising=False)

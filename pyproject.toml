@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "atom"
+name = "atom-brain"
 version = "1.4.0"
 description = "Convert books and documents into structured, on-demand agent skills."
 readme = "README.md"
@@ -11,7 +11,7 @@ requires-python = ">=3.9"
 license = { text = "MIT" }
 
 [project.scripts]
-atom = "atom.cli:main"
+atom = "atom_brain.cli:main"
 
 [project.optional-dependencies]
 html = ["trafilatura"]

@@ -15,10 +15,10 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom import ocr  # noqa: E402
-from atom.master import build_master, load_master  # noqa: E402
-from atom.parsers import pdf as pdf_parser  # noqa: E402
-from atom.sanitize import sanitize_extracted_text  # noqa: E402
+from atom_brain import ocr  # noqa: E402
+from atom_brain.master import build_master, load_master  # noqa: E402
+from atom_brain.parsers import pdf as pdf_parser  # noqa: E402
+from atom_brain.sanitize import sanitize_extracted_text  # noqa: E402
 
 
 def _two_column_page(rows=12):

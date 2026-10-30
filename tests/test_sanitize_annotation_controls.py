@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.sanitize import is_invisible_codepoint, sanitize_extracted_text
+from atom_brain.sanitize import is_invisible_codepoint, sanitize_extracted_text
 
 # U+206A-206F (deprecated format controls) + U+FFF9-FFFB (interlinear annotation).
 ANNOTATION_CONTROLS = "".join(

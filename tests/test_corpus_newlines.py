@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from atom.utils import detect_structure
+from atom_brain.utils import detect_structure
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -88,12 +88,12 @@ def test_corpus_writer_explicitly_disables_host_newline_translation(
         return real_open(self, mode, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", record_open)
-    monkeypatch.setattr("atom.utils.OUTPUT_DIR", output)
-    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", output / "full_text.txt")
-    monkeypatch.setattr("atom.utils.OUTPUT_META", output / "metadata.json")
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", output)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", output / "full_text.txt")
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_META", output / "metadata.json")
     monkeypatch.setattr("sys.argv", ["extract.py", str(source), "--install-missing", "no"])
 
-    from atom.utils import main
+    from atom_brain.utils import main
 
     main()
 

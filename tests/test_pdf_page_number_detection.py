@@ -16,7 +16,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.parsers.pdf import _PDF_PAGE_NUM, clean_pdftotext  # noqa: E402
+from atom_brain.parsers.pdf import _PDF_PAGE_NUM, clean_pdftotext  # noqa: E402
 
 
 # Words made only of Roman-numeral letters that are not canonical numerals.

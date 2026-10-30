@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from atom.utils import _sha256_file, extract_single_file, reuse_is_safe
+from atom_brain.utils import _sha256_file, extract_single_file, reuse_is_safe
 
 
 def _write(tmp_path: Path, name: str, content: str) -> Path:
@@ -34,7 +34,7 @@ def test_metadata_sources_list_carries_sha256(tmp_path, monkeypatch):
     # The guard reads metadata.json, so the per-source fingerprint must survive
     # consolidation. Follows test_metadata_encoding.py's pattern: run main()
     # end-to-end with OUTPUT_META pointed at a tmp path, then parse the JSON.
-    from atom.utils import main
+    from atom_brain.utils import main
 
     src = _write(tmp_path, "doc.txt", "content\n" * 100)
     expected = hashlib.sha256(src.read_bytes()).hexdigest()
@@ -42,10 +42,10 @@ def test_metadata_sources_list_carries_sha256(tmp_path, monkeypatch):
     out_dir = tmp_path / "output"
     out_meta = out_dir / "metadata.json"
     monkeypatch.setenv("BOOK_SKILL_WORKDIR", str(out_dir))
-    monkeypatch.setattr("atom.utils.OUTPUT_DIR", out_dir)
-    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", out_dir / "full_text.txt")
-    monkeypatch.setattr("atom.utils.OUTPUT_META", out_meta)
-    monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *a: None)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", out_dir)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", out_dir / "full_text.txt")
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_META", out_meta)
+    monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *a: None)
     monkeypatch.setattr(
         "sys.argv", ["extract.py", str(src), "--install-missing", "no"]
     )
@@ -60,7 +60,7 @@ def test_hook_path_result_carries_sha256(tmp_path, monkeypatch):
     # per-source dict. That dict must carry the fingerprint too (review F3).
     from types import SimpleNamespace
 
-    import atom.pdf_inspector_integration as pii
+    import atom_brain.pdf_inspector_integration as pii
 
     src = _write(tmp_path, "doc.pdf", "%PDF-1.4 fake minimal payload\n" * 50)
     expected = hashlib.sha256(src.read_bytes()).hexdigest()
@@ -186,15 +186,15 @@ def test_scenario_sources_changed_falls_back(tmp_path):
 
 
 def _extract_sources_metadata(tmp_path, monkeypatch, sources):
-    from atom.utils import main
+    from atom_brain.utils import main
 
     out_dir = tmp_path / "output"
     out_meta = out_dir / "metadata.json"
     monkeypatch.setenv("BOOK_SKILL_WORKDIR", str(out_dir))
-    monkeypatch.setattr("atom.utils.OUTPUT_DIR", out_dir)
-    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", out_dir / "full_text.txt")
-    monkeypatch.setattr("atom.utils.OUTPUT_META", out_meta)
-    monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *a: None)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", out_dir)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", out_dir / "full_text.txt")
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_META", out_meta)
+    monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *a: None)
     monkeypatch.setattr(
         "sys.argv",
         ["extract.py", *map(str, sources), "--mode", "text", "--install-missing", "no"],
@@ -205,7 +205,7 @@ def _extract_sources_metadata(tmp_path, monkeypatch, sources):
 
 
 def test_reuse_rejects_replacement_after_duplicate_basenames(tmp_path, monkeypatch):
-    from atom.utils import _sha256_file
+    from atom_brain.utils import _sha256_file
 
     first_dir = tmp_path / "a"
     second_dir = tmp_path / "b"
@@ -234,7 +234,7 @@ def test_reuse_rejects_replacement_after_duplicate_basenames(tmp_path, monkeypat
 
 
 def test_reuse_duplicate_basenames_matches_hash_pair_multiplicity(tmp_path, monkeypatch):
-    from atom.utils import _sha256_file
+    from atom_brain.utils import _sha256_file
 
     first_dir = tmp_path / "a"
     second_dir = tmp_path / "b"
@@ -269,7 +269,7 @@ def test_reuse_duplicate_basenames_matches_hash_pair_multiplicity(tmp_path, monk
 
 
 def test_cli_rebuilds_corpus_when_duplicate_sources_are_reordered(tmp_path, monkeypatch):
-    from atom.utils import _sha256_file
+    from atom_brain.utils import _sha256_file
 
     first_dir = tmp_path / "a"
     second_dir = tmp_path / "b"

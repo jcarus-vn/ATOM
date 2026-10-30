@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.config import default_output_dir  # noqa: E402
+from atom_brain.config import default_output_dir  # noqa: E402
 
 
 def _reimport_config(monkeypatch, workdir_env):
@@ -30,7 +30,7 @@ def _reimport_config(monkeypatch, workdir_env):
         monkeypatch.delenv("BOOK_SKILL_WORKDIR", raising=False)
     else:
         monkeypatch.setenv("BOOK_SKILL_WORKDIR", workdir_env)
-    import atom.config as config
+    import atom_brain.config as config
 
     return importlib.reload(config)
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import zipfile
 
-from atom.exceptions import ExtractionError
+from atom_brain.exceptions import ExtractionError
 
 MAX_TOTAL_UNCOMPRESSED = 512 * 1024 * 1024   # whole archive
 MAX_MEMBER_UNCOMPRESSED = 128 * 1024 * 1024  # one XML/HTML part

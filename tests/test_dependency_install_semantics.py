@@ -1,6 +1,6 @@
 """Runtime dependency prompts should match the extractor fallback semantics."""
 
-from atom import dependencies
+from atom_brain import dependencies
 
 
 def _fail_install(packages):

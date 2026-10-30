@@ -3,7 +3,7 @@ import sys
 import zipfile
 from unittest import mock
 
-from atom.utils import extract_single_file, main
+from atom_brain.utils import extract_single_file, main
 
 
 def _make_epub_with_images(path, image_count=2):
@@ -38,7 +38,7 @@ def _make_epub_with_images(path, image_count=2):
 def test_epub_extraction_reports_material_dropped_images(tmp_path, capsys):
     source = _make_epub_with_images(tmp_path / "figures.epub", image_count=6)
 
-    with mock.patch("atom.utils.prepare_dependencies"):
+    with mock.patch("atom_brain.utils.prepare_dependencies"):
         result = extract_single_file(source, "text", "no")
 
     assert result["images_dropped"] == 6
@@ -50,7 +50,7 @@ def test_epub_extraction_reports_material_dropped_images(tmp_path, capsys):
 def test_epub_extraction_keeps_cover_only_book_quiet(tmp_path, capsys):
     source = _make_epub_with_images(tmp_path / "novel.epub", image_count=1)
 
-    with mock.patch("atom.utils.prepare_dependencies"):
+    with mock.patch("atom_brain.utils.prepare_dependencies"):
         result = extract_single_file(source, "text", "no")
 
     assert result["images_dropped"] == 1
@@ -65,10 +65,10 @@ def test_main_persists_epub_image_loss_in_source_and_total_metadata(
     output_meta = output_dir / "metadata.json"
 
     monkeypatch.setattr(sys, "argv", ["extract.py", str(source), "--install-missing", "no"])
-    monkeypatch.setattr("atom.utils.OUTPUT_DIR", output_dir)
-    monkeypatch.setattr("atom.utils.OUTPUT_TEXT", output_dir / "full_text.txt")
-    monkeypatch.setattr("atom.utils.OUTPUT_META", output_meta)
-    monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *args: None)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", output_dir)
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", output_dir / "full_text.txt")
+    monkeypatch.setattr("atom_brain.utils.OUTPUT_META", output_meta)
+    monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *args: None)
 
     main()
 

@@ -7,9 +7,9 @@ import sys
 import zipfile
 from urllib.parse import unquote, urlsplit
 
-from atom.exceptions import ExtractionError
-from atom.parsers.html import _HTMLTextExtractor, soup_text
-from atom.parsers.zip_limits import check_zip_limits
+from atom_brain.exceptions import ExtractionError
+from atom_brain.parsers.html import _HTMLTextExtractor, soup_text
+from atom_brain.parsers.zip_limits import check_zip_limits
 
 
 _IMAGE_EXTENSIONS = (

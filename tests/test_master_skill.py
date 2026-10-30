@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.master import (
+from atom_brain.master import (
     build_master,
     list_masters,
     load_master,

@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.utils import main
+from atom_brain.utils import main
 
 
 class TestMetadataOutputEncoding:
@@ -29,10 +29,10 @@ class TestMetadataOutputEncoding:
         out_dir = tmp_path / "output"
         out_meta = out_dir / "metadata.json"
         monkeypatch.setenv("BOOK_SKILL_WORKDIR", str(out_dir))
-        monkeypatch.setattr("atom.utils.OUTPUT_DIR", out_dir)
-        monkeypatch.setattr("atom.utils.OUTPUT_TEXT", out_dir / "full_text.txt")
-        monkeypatch.setattr("atom.utils.OUTPUT_META", out_meta)
-        monkeypatch.setattr("atom.utils.prepare_dependencies", lambda *a: None)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_DIR", out_dir)
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_TEXT", out_dir / "full_text.txt")
+        monkeypatch.setattr("atom_brain.utils.OUTPUT_META", out_meta)
+        monkeypatch.setattr("atom_brain.utils.prepare_dependencies", lambda *a: None)
         monkeypatch.setattr(
             "sys.argv", ["extract.py", str(source), "--install-missing", "no"]
         )

@@ -23,7 +23,7 @@ The compact form stores each fact once:
   seeking to the lines a query actually needs.
 
 Query is two-phase: phase 1 ranks from registry + index alone (every
-input to :func:`atom.master.rank_notes` is derivable from metadata and
+input to :func:`atom_brain.master.rank_notes` is derivable from metadata and
 the index, so the ranking is identical to the full scan — see
 :func:`rank_compact` and its equality tests); phase 2 fetches bodies
 for the top-k only. A question therefore loads kilobytes, not the
@@ -51,7 +51,7 @@ import json
 import re
 from pathlib import Path
 
-from atom.master import (
+from atom_brain.master import (
     CONCEPT_BOOST,
     EXPANSION_BONUS,
     EXPANSION_SEEDS,
@@ -509,7 +509,7 @@ def build_index(compact: dict, bodies: dict[str, str]) -> dict:
     note ordinals (not slugs), which keeps the index small. Per-note
     metadata carries everything ranking needs except bodies: title
     terms, topic terms, acronym, kind, source urls and chapter keys
-    (computed with the exact procedure :func:`atom.master._chapter_keys`
+    (computed with the exact procedure :func:`atom_brain.master._chapter_keys`
     uses, via rebuilt citations), and graph adjacency.
     """
     vocab: list[str] = []
@@ -602,7 +602,7 @@ def rank_compact(index: dict, question: str, k: int | None = None,
                  cite_texts: dict[str, list[str]] | None = None) -> list[dict]:
     """Rank notes using only the compact index (no bodies loaded).
 
-    Mirrors :func:`atom.master.rank_notes` exactly: same base formula,
+    Mirrors :func:`atom_brain.master.rank_notes` exactly: same base formula,
     same params defaults, same seed/chapter/graph expansion, same
     (-score, id) tie-breaks. Returns entries with ``note_id`` instead
     of ``note`` (bodies are fetched separately for the top-k).

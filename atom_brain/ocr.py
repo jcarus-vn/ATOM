@@ -514,7 +514,7 @@ def ocr_pdf_with_ocrmypdf(pdf_path: str, timeout: int = DEFAULT_OCR_TIMEOUT) -> 
     if not shutil.which("ocrmypdf"):
         return None
     try:
-        from atom.parsers.pdf import extract_with_pdftotext
+        from atom_brain.parsers.pdf import extract_with_pdftotext
     except ImportError:
         return None
     with tempfile.TemporaryDirectory(prefix="book_skill_ocr_") as tmp:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 import html.parser
-from atom.parsers.text import read_text_file
+from atom_brain.parsers.text import read_text_file
 
 
 class _HTMLTextExtractor(html.parser.HTMLParser):

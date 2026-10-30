@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import atom.pdf_inspector_integration as integration
-from atom.exceptions import ExtractionError
+import atom_brain.pdf_inspector_integration as integration
+from atom_brain.exceptions import ExtractionError
 
 
 def _fake_result(**overrides):

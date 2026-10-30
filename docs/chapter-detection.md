@@ -4,7 +4,7 @@ The legacy detector only counted explicit "Chapter N" headings (plus a
 Markdown structural fallback). It under-counted books that organize
 chapters as bare titles (Moby-Dick: "Loomings"), Roman numerals without
 the word "Chapter", or section-style headings (Pro Git). The flexible
-detector in `atom/chapter_detection.py` layers strategies with
+detector in `atom_brain/chapter_detection.py` layers strategies with
 confidence scores and merges them, deduped and sorted by page:
 
 1. **explicit** (0.9-0.95): "Chapter N", "Unit N", "Part N", "Lesson N",

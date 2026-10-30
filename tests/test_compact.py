@@ -1,4 +1,4 @@
-"""Tests for atom/compact.py: citation factoring, compact/expand fidelity,
+"""Tests for atom_brain/compact.py: citation factoring, compact/expand fidelity,
 inverted-index ranking equality with rank_notes, and lazy bodies.
 
 All fixtures are synthetic sentences written for these tests; no book
@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atom.compact import (
+from atom_brain.compact import (
     build_index,
     compact_master,
     expand_compact_master,
@@ -23,7 +23,7 @@ from atom.compact import (
     rank_compact,
     rebuild_citation,
 )
-from atom.master import load_master, rank_notes
+from atom_brain.master import load_master, rank_notes
 
 
 def _cite(url, chapter=None):
@@ -183,7 +183,7 @@ def test_rank_equality_with_source_bound():
     index = build_index(compact, _bodies(master))
     cite_texts = {}
     for entry in compact["notes"]:
-        from atom.compact import _decode_srcs
+        from atom_brain.compact import _decode_srcs
         cite_texts[entry["id"]] = _decode_srcs(entry["src"], compact["cites"])
     for question in ("What is a shared concept?", "How do gears work?"):
         legacy = rank_notes(master["notes"], master["taxonomy"],

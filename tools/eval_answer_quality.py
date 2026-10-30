@@ -9,7 +9,7 @@ it runs today with no model key.
 Three layers, in order of strength:
 
 1. Retrieval quality. A question is ranked with the shared path
-   ``atom.master.rank_notes`` (title + taxonomy + facet-topic overlap,
+   ``atom_brain.master.rank_notes`` (title + taxonomy + facet-topic overlap,
    concept-identity and definitional-glossary boosts, chapter/graph
    expansion) -- the same function the product query
    (``scripts/build_master.py --question``) uses, so a measured
@@ -57,9 +57,9 @@ if __name__ == "__main__":
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atom.master import load_master, normalize_title, rank_notes  # noqa: E402
-from atom.compact import query_compact_dir  # noqa: E402
-from atom.utils import estimate_tokens  # noqa: E402
+from atom_brain.master import load_master, normalize_title, rank_notes  # noqa: E402
+from atom_brain.compact import query_compact_dir  # noqa: E402
+from atom_brain.utils import estimate_tokens  # noqa: E402
 
 STOPWORDS = {
     "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
@@ -112,9 +112,9 @@ def extract_urls(citation: str) -> set[str]:
 def retrieve(notes: list[dict], taxonomy_nodes: list[dict],
              question: str, k: int, graph_edges: list[dict] | None = None,
              rank_params: dict | None = None) -> list[dict]:
-    """Rank notes for *question* via the shared path (atom.master).
+    """Rank notes for *question* via the shared path (atom_brain.master).
 
-    This is a thin wrapper over :func:`atom.master.rank_notes` so the
+    This is a thin wrapper over :func:`atom_brain.master.rank_notes` so the
     eval measures exactly what the product query does. The full ranking
     is returned (callers slice to top-k), preserving MRR semantics.
     ``rank_params`` passes ranker-knob overrides through (see
@@ -243,7 +243,7 @@ def main() -> int:
                         help="External judge command reading JSON on stdin")
     parser.add_argument("--rank-params", default=None,
                         help="JSON object of ranker-knob overrides passed to "
-                             "atom.master.rank_notes (see its docstring); "
+                             "atom_brain.master.rank_notes (see its docstring); "
                              "omitted means the shipped defaults")
     parser.add_argument("--output-json", type=Path, default=None)
     parser.add_argument("--compact", action="store_true",

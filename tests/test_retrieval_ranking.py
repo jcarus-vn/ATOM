@@ -1,4 +1,4 @@
-"""Tests for the shared ranked retrieval in atom.master.
+"""Tests for the shared ranked retrieval in atom_brain.master.
 
 Synthetic notes only: these assert the ranking mechanisms (concept
 identity, bounded title coverage, chapter/graph expansion, related
@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.master import rank_notes, suggest_related  # noqa: E402
+from atom_brain.master import rank_notes, suggest_related  # noqa: E402
 
 
 def note(note_id, title, body, sources=(), kind="glossary", topic=""):
@@ -105,7 +105,7 @@ def test_area_edges_never_suggested():
 # Per-book bound layer: --source restricts every path to one source.
 # ---------------------------------------------------------------------------
 
-from atom.master import bound_view, query_notes  # noqa: E402
+from atom_brain.master import bound_view, query_notes  # noqa: E402
 
 
 def test_query_notes_source_filter_composes_with_term():

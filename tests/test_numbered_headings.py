@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.utils import _structural_chapter_count
+from atom_brain.utils import _structural_chapter_count
 
 CHAPTER_BODY = "prose carrying the section's actual content. " * 40   # ~1.8k chars
 STEP_BODY = "run the command below."                                  # ~22 chars

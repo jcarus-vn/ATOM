@@ -22,7 +22,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.parsers.html import extract_html_content
+from atom_brain.parsers.html import extract_html_content
 
 SAMPLE_HTML = "<html><body><h1>Chapter 1</h1><p>Real content here.</p></body></html>"
 

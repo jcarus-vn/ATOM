@@ -2,8 +2,8 @@ import codecs
 import html
 import re
 import sys
-from atom.parsers.text import read_text_file
-from atom.exceptions import ExtractionError
+from atom_brain.parsers.text import read_text_file
+from atom_brain.exceptions import ExtractionError
 
 
 # RTF unicode escape: \uN (signed decimal) followed by its fallback char(s).

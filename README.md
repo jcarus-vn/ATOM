@@ -257,7 +257,7 @@ ATOM/
 ├── scripts/
 │   ├── extract.py        # Thin entrypoint wrapper (books, docs, web URLs, scanned PDFs)
 │   └── build_master.py   # Build a field master skill from skills + notes
-├── atom/        # Deterministic extraction package
+├── atom_brain/        # Deterministic extraction package
 │   ├── chapter_detection.py  # Flexible chapter splitting
 │   ├── master.py             # Atomic notes, taxonomy, graph, facets, registry
 │   ├── ocr.py                # Scanned-PDF OCR + figure blocks, opt-in vision hook

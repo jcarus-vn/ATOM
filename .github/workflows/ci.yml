@@ -43,7 +43,7 @@ jobs:
         # High-value gate: syntax errors (E9, e.g. IndentationError) + pyflakes
         # (F: undefined names, unused imports). Style rules are intentionally
         # not gated yet to avoid blocking on cosmetic churn.
-        run: ruff check --select E9,F --target-version py310 atom/ scripts/ tests/ tools/
+        run: ruff check --select E9,F --target-version py310 atom_brain/ scripts/ tests/ tools/
 
   optional-deps:
     name: test (optional deps installed)
@@ -108,6 +108,21 @@ jobs:
           test -f "$BOOK_SKILL_WORKDIR/full_text.txt"
           test -f "$BOOK_SKILL_WORKDIR/metadata.json"
           grep -q "Backpressure" "$BOOK_SKILL_WORKDIR/full_text.txt"
+      - name: pip install side by side with the unrelated PyPI `atom`
+        # The distribution used to be called `atom`, the name of nucleic/atom
+        # on PyPI, so installing one replaced the other. Install both into a
+        # clean venv and check neither is lost and the `atom` command works.
+        run: |
+          set -euo pipefail
+          trap 'echo "::error::side-by-side install failed at: $BASH_COMMAND"' ERR
+          python3 -m venv "$RUNNER_TEMP/venv"
+          . "$RUNNER_TEMP/venv/bin/activate"
+          pip install -q atom
+          pip install -q .
+          pip show atom atom-brain | grep -E '^(Name|Summary):'
+          python -c "from atom.api import Atom; import atom_brain; print(Atom, atom_brain.__file__)"
+          cd "$RUNNER_TEMP"
+          atom --check
 
   security:
     name: security (bandit + zizmor)
@@ -123,9 +138,9 @@ jobs:
         # Hard gate: only HIGH-severity / MEDIUM-confidence findings fail CI, to
         # avoid blocking on the known-acceptable subprocess (pip install) calls.
         # Ratchet down to medium once the open B314 docx-XML finding is hardened.
-        run: bandit -q -r atom scripts tools --severity-level high --confidence-level medium
+        run: bandit -q -r atom_brain scripts tools --severity-level high --confidence-level medium
       - name: Bandit — report MEDIUM+ (informational)
-        run: bandit -q -r atom scripts tools -ll || true
+        run: bandit -q -r atom_brain scripts tools -ll || true
       - name: Zizmor — workflow audit (informational)
         # Surfaces GitHub Actions risks (injection, pull_request_target misuse).
         # Currently only flags unpinned-uses (tags vs SHA) — non-blocking until

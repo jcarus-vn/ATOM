@@ -22,9 +22,9 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from atom.parsers.epub import extract_with_zipfile
-from atom.parsers.html import _HTMLTextExtractor
-from atom.utils import detect_structure
+from atom_brain.parsers.epub import extract_with_zipfile
+from atom_brain.parsers.html import _HTMLTextExtractor
+from atom_brain.utils import detect_structure
 
 
 def _text(fragment: str) -> str:
