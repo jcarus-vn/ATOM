@@ -114,12 +114,13 @@ jobs:
         # clean venv and check neither is lost and the `atom` command works.
         run: |
           set -euo pipefail
+          trap 'echo "::error::side-by-side install failed at: $BASH_COMMAND"' ERR
           python3 -m venv "$RUNNER_TEMP/venv"
           . "$RUNNER_TEMP/venv/bin/activate"
           pip install -q atom
           pip install -q .
           pip show atom atom-brain | grep -E '^(Name|Summary):'
-          python -c "import atom, atom_brain; assert hasattr(atom, 'Atom'), atom.__file__; print(atom_brain.__file__)"
+          python -c "from atom.api import Atom; import atom_brain; print(Atom, atom_brain.__file__)"
           cd "$RUNNER_TEMP"
           atom --check
 
