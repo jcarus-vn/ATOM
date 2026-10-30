@@ -27,6 +27,8 @@ def default_output_dir() -> Path:
 OUTPUT_DIR = Path(os.environ.get("BOOK_SKILL_WORKDIR") or default_output_dir())
 OUTPUT_TEXT = OUTPUT_DIR / "full_text.txt"
 OUTPUT_META = OUTPUT_DIR / "metadata.json"
+# Full per-chapter detail; metadata.json carries only a short summary of it.
+OUTPUT_CHAPTERS = OUTPUT_DIR / "chapters.json"
 
 WORDS_PER_TOKEN = 0.75  # approximate (Latin / whitespace-delimited text)
 # CJK scripts carry little or no whitespace, so word-splitting under-counts them

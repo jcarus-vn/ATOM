@@ -56,7 +56,9 @@ from atom.master import (
     EXPANSION_BONUS,
     EXPANSION_SEEDS,
     GLOSSARY_BONUS,
+    _DEFINITIONAL,
     _rank_terms,
+    _raw_terms,
     normalize_title,
 )
 
@@ -626,8 +628,8 @@ def rank_compact(index: dict, question: str, k: int | None = None,
     vocab_lookup = {term: i for i, term in enumerate(vocab)}
     qterm_ids = {vocab_lookup[t] for t in qterms if t in vocab_lookup}
     qnorm = normalize_title(question)
-    qraw = set(re.findall(r"[a-z0-9]+", qnorm))
-    definitional = bool(qraw & {"what", "define", "definition", "mean", "means"})
+    qraw = set(_raw_terms(question))
+    definitional = bool(qraw & _DEFINITIONAL)
 
     # Body-hit counts from the inverted index (no bodies touched).
     body_hits: dict[int, int] = {}

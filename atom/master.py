@@ -53,8 +53,11 @@ so the two never drift apart within one build.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+import shutil
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -65,20 +68,85 @@ GRAPH_EDGE_TYPES = (
 NOTE_STATUSES = ("single-source", "consensus", "contested")
 
 
+_SYMBOL_WORDS = (("++", " plus plus "), ("+", " plus "), ("#", " sharp "),
+                 ("*", " star "))
+
+
+def _strip_latin_marks(text: str) -> str:
+    """Drop combining marks that sit on a Latin base letter only.
+
+    "Định vị" -> "Dinh vi", while Devanagari vowel signs, Thai tone marks
+    and other scripts' combining marks are kept (dropping them would change
+    the word, not just its accent).
+    """
+    out: list[str] = []
+    base_is_latin = False
+    for ch in unicodedata.normalize("NFKD", text):
+        if unicodedata.combining(ch):
+            if not base_is_latin:
+                out.append(ch)
+            continue
+        base_is_latin = "LATIN" in unicodedata.name(ch, "")
+        out.append(ch)
+    return unicodedata.normalize("NFC", "".join(out))
+
+
+def _is_word_char(ch: str) -> bool:
+    """Letters and digits of any script, plus combining marks (vowel signs,
+    viramas, tone marks) so an Indic or Thai word is not cut in pieces."""
+    return ch.isalnum() or unicodedata.category(ch).startswith("M")
+
+
+def _word_runs(text: str, keep: str = "") -> list[str]:
+    """Maximal runs of word characters. A *keep* symbol stays glued to the
+    word it follows ("c++", "rrt*") or forms its own run ("+")."""
+    runs: list[str] = []
+    cur: list[str] = []
+    for ch in text:
+        if _is_word_char(ch):
+            if cur and cur[-1] in keep:
+                runs.append("".join(cur))
+                cur = []
+            cur.append(ch)
+        elif ch in keep:
+            cur.append(ch)
+        elif cur:
+            runs.append("".join(cur))
+            cur = []
+    if cur:
+        runs.append("".join(cur))
+    return runs
+
+
 def slugify(value: str) -> str:
-    """Stable slug: lowercase, accents stripped, non-alphanumerics to '-'."""
-    text = unicodedata.normalize("NFKD", value or "")
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    """Stable, readable slug for file names and ids.
+
+    Latin accents are stripped ("Định vị" -> "dinh-vi", "đ" -> "d"); the
+    symbols that distinguish technical names are spelled out ("C++" ->
+    "c-plus-plus", "C#" -> "c-sharp", "RRT*" -> "rrt-star"); letters of
+    other scripts are kept ("Фильтр Калмана" -> "фильтр-калмана"), so a
+    non-Latin title never collapses to the same slug as another one.
+    ASCII titles without those symbols slug exactly as before.
+    """
+    text = value or ""
+    for sym, word in _SYMBOL_WORDS:
+        text = text.replace(sym, word)
+    text = _strip_latin_marks(text).replace("đ", "d").replace("Đ", "D")
+    text = "-".join(_word_runs(text.lower()))
     return text or "concept"
 
 
 def normalize_title(value: str) -> str:
-    """Title key for dedupe: lowercase, collapsed whitespace, no punctuation."""
-    text = unicodedata.normalize("NFKD", value or "")
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
-    return re.sub(r"\s+", " ", text)
+    """Title key for dedupe and matching.
+
+    NFKC + casefold, words of every script kept, accents kept (in
+    Vietnamese "bàn" and "bán" are different words), and the symbols that
+    make a different concept kept on their word: "C++" != "C#" != "C",
+    "RRT*" != "RRT". Punctuation and spacing are ignored, so ASCII titles
+    without those symbols normalize exactly as before.
+    """
+    text = unicodedata.normalize("NFKC", value or "").casefold()
+    return " ".join(_word_runs(text, keep="+#*"))
 
 
 def citation_for(source: dict, chapter: str | None = None,
@@ -99,6 +167,24 @@ def citation_for(source: dict, chapter: str | None = None,
 
 def _source_key(source: dict) -> str:
     return source.get("url") or source.get("name", "")
+
+
+def group_sides(sides: list[dict]) -> list[dict]:
+    """One entry per distinct definition, with every source that gave it
+    (joined with "; "), in first-seen order. Pairs are never re-matched by
+    position, so a definition is always shown with its own sources."""
+    grouped: dict[str, list[str]] = {}
+    for side in sides:
+        cites = grouped.setdefault(side["definition"], [])
+        if side["source"] not in cites:
+            cites.append(side["source"])
+    return [{"definition": d, "source": "; ".join(c)} for d, c in grouped.items()]
+
+
+def render_contested_body(sides: list[dict]) -> str:
+    """One bullet per distinct definition, followed by its own sources."""
+    return "\n".join(f"- {s['definition']} (source: {s['source']})"
+                     for s in group_sides(sides))
 
 
 def _status_for(definitions: list[str], source_count: int) -> str:
@@ -180,6 +266,10 @@ def merge_sources(sources: list[dict]) -> dict:
                         "kind": kind,
                         "body": text,
                         "definitions": [],
+                        # (definition, citation) pairs, kept together from
+                        # the moment they are read: a contested note shows
+                        # each definition beside the source that gave it.
+                        "sides": [],
                         "sources": [],
                         "source_keys": [],
                         "facets": _facets_for(item, kind, [src]),
@@ -195,29 +285,35 @@ def merge_sources(sources: list[dict]) -> dict:
                     note_kinds[key] |= kinds_by_key.get(skey, set())
                 if text and text not in note["definitions"]:
                     note["definitions"].append(text)
+                if text:
+                    side = {"definition": text, "source": cite}
+                    if side not in note["sides"]:
+                        note["sides"].append(side)
                 kinds = note_kinds[key]
                 note["facets"]["source_type"] = (
                     "book" if kinds == {"book"} else
                     "web" if kinds == {"web"} else "mixed")
                 if note["facets"].get("topic") in (None, "general") and item.get("topic"):
                     note["facets"]["topic"] = item["topic"]
-    used_ids: dict[str, int] = {}
+    used_ids: set[str] = set()
     for key in order:
         note = notes[key]
         base = note["id"]
-        if base in used_ids:
-            used_ids[base] += 1
-            note["id"] = f"{base}-{note['kind']}"
-        else:
-            used_ids[base] = 1
+        candidate = base
+        if candidate in used_ids:
+            candidate = f"{base}-{note['kind']}"
+        n = 2
+        while candidate in used_ids:
+            candidate = f"{base}-{note['kind']}-{n}"
+            n += 1
+        note["id"] = candidate
+        used_ids.add(candidate)
     merged_notes = []
     for key in order:
         note = notes[key]
         note["status"] = _status_for(note["definitions"], len(note["source_keys"]))
         if note["status"] == "contested":
-            note["body"] = "\n".join(
-                f"- {d} (source: {c})"
-                for d, c in zip(note["definitions"], note["sources"]))
+            note["body"] = render_contested_body(note["sides"])
         elif note["definitions"]:
             note["body"] = note["definitions"][0]
         note["links"] = []
@@ -264,14 +360,63 @@ def merge_sources(sources: list[dict]) -> dict:
 
     conflicts = [
         {"term": n["title"], "status": "contested",
-         "definitions": [
-             {"definition": d, "source": c}
-             for d, c in zip(n["definitions"], n["sources"])],
+         "definitions": group_sides(n["sides"]),
          "sources": list(n["sources"])}
         for n in merged_notes if n["status"] == "contested"
     ]
     return {"notes": merged_notes, "cross_index": cross_index,
             "conflicts": conflicts, "unresolved_relations": unresolved}
+
+
+_SOURCE_KEYS = {"name", "kind", "url", "fetched_at", "chapters", "glossary",
+                "patterns", "relations", "aliases", "taxonomy"}
+_ITEM_KEYS = {
+    "glossary": ({"term", "definition"}, {"chapter", "page", "topic", "level", "technique"}),
+    "patterns": ({"name", "description"}, {"chapter", "page", "topic", "level", "technique"}),
+    "relations": ({"from", "type", "to"}, {"chapter"}),
+}
+
+
+def validate_manifest(manifest: dict) -> list[str]:
+    """Problems that would make build_master silently drop content.
+
+    The builder reads fixed keys; a manifest with "def" for "definition"
+    or "title" for "name" used to build a master with those items missing
+    and exit 0. Returns readable problems (empty list = fine).
+    """
+    problems: list[str] = []
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("sources"), list):
+        return ['top level must be an object with a "sources" list']
+    for i, src in enumerate(manifest["sources"]):
+        where = f"sources[{i}] ({src.get('name', '?') if isinstance(src, dict) else '?'})"
+        if not isinstance(src, dict):
+            problems.append(f"{where}: must be an object")
+            continue
+        if not src.get("name"):
+            problems.append(f"{where}: missing \"name\"")
+        if src.get("kind") not in ("book", "web"):
+            problems.append(f"{where}: \"kind\" must be \"book\" or \"web\"")
+        if src.get("kind") == "web" and not src.get("url"):
+            problems.append(f"{where}: a web source needs \"url\"")
+        for key in sorted(set(src) - _SOURCE_KEYS):
+            problems.append(f"{where}: unknown key \"{key}\"")
+        for list_key, (required, optional) in _ITEM_KEYS.items():
+            for j, item in enumerate(src.get(list_key) or []):
+                if not isinstance(item, dict):
+                    problems.append(f"{where}.{list_key}[{j}]: must be an object")
+                    continue
+                missing = sorted(required - set(item))
+                unknown = sorted(set(item) - required - optional)
+                if missing:
+                    problems.append(f"{where}.{list_key}[{j}]: missing {missing}")
+                if unknown:
+                    problems.append(f"{where}.{list_key}[{j}]: unknown {unknown}")
+                if list_key == "relations" and item.get("type") not in GRAPH_EDGE_TYPES:
+                    problems.append(f"warning: {where}.relations[{j}]: type "
+                                    f"{item.get('type')!r} is not one of "
+                                    f"{', '.join(GRAPH_EDGE_TYPES)}; it will be "
+                                    "listed as unresolved, not drawn")
+    return problems
 
 
 def build_taxonomy(notes: list[dict], sources: list[dict],
@@ -497,7 +642,16 @@ _RANK_STOPWORDS = {
     "by", "and", "or", "but", "not", "no", "than", "then", "into",
     "its", "it", "as", "that", "this", "these", "those", "there",
     "between", "under", "over", "each", "other", "both", "per",
+    # Vietnamese function words (syllables), so a Vietnamese question is
+    # not ranked by "là", "của", "như thế nào".
+    "là", "gì", "của", "và", "các", "những", "một", "có", "không", "được",
+    "trong", "cho", "với", "để", "này", "đó", "khi", "nào", "thế", "như",
+    "sao", "tại", "vì", "thì", "mà", "nên", "hay", "hoặc", "ra", "bị",
+    "ở", "về", "từ", "đến", "theo", "nó", "chúng", "gồm", "làm",
 }
+# Words that mark a definition question ("what is", "là gì", "định nghĩa").
+_DEFINITIONAL = {"what", "define", "definition", "mean", "means",
+                 "gì", "nghĩa"}
 
 CONCEPT_BOOST = 6.0
 GLOSSARY_BONUS = 3.0
@@ -505,10 +659,31 @@ EXPANSION_BONUS = 4.0
 EXPANSION_SEEDS = 3
 
 
+_CJK_RUN = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
+
+def _raw_terms(text: str) -> list[str]:
+    """Normalized word runs of *text* (any script), symbols dropped.
+
+    ASCII text yields exactly the tokens the old ``[a-z0-9]+`` scan did.
+    Han/kana runs carry no spaces, so they are split into overlapping
+    character bigrams ("卡尔曼滤波" -> "卡尔", "尔曼", ...), the usual
+    dependency-free way to match CJK text.
+    """
+    out: list[str] = []
+    for run in _word_runs(normalize_title(text or "")):
+        if _CJK_RUN.search(run) and len(run) > 2:
+            out.extend(run[i:i + 2] for i in range(len(run) - 1))
+        else:
+            out.append(run)
+    return out
+
+
 def _rank_terms(text: str) -> list[str]:
     """Content terms of *text*: normalized tokens minus stopwords."""
-    return [t for t in re.findall(r"[a-z0-9]+", normalize_title(text or ""))
-            if t not in _RANK_STOPWORDS and len(t) >= 2]
+    return [t for t in _raw_terms(text)
+            if t not in _RANK_STOPWORDS
+            and (len(t) >= 2 or not t.isascii())]
 
 
 def _chapter_keys(note: dict) -> set[str]:
@@ -583,14 +758,14 @@ def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
                 cfg[key] = params[key]
     qterms = set(_rank_terms(question))
     qnorm = normalize_title(question)
-    qraw = set(re.findall(r"[a-z0-9]+", qnorm))
+    qraw = set(_raw_terms(question))
     node_labels: dict[str, set[str]] = {}
     for node in taxonomy_nodes or []:
         label_terms = set(_rank_terms(node.get("label", "")))
         for url in node.get("sources", []):
             for found in re.findall(r"https?://\S+", url):
                 node_labels.setdefault(found, set()).update(label_terms)
-    definitional = bool(qraw & {"what", "define", "definition", "mean", "means"})
+    definitional = bool(qraw & _DEFINITIONAL)
     base: dict[str, dict] = {}
     for note in notes:
         title_terms = set(_rank_terms(note.get("title", "")))
@@ -809,13 +984,16 @@ def parse_note_md(text: str) -> dict | None:
     # "- <definition> (source: <citation>)" lines, one per side; any other
     # body is a single definition.
     bullet_defs = []
+    sides = []
     body_nonempty = [ln for ln in body.splitlines() if ln.strip()]
     for ln in body_nonempty:
         m = re.match(r"^-\s+(.+?)\s+\(source:\s+(.+)\)\s*$", ln.strip())
         if m:
             bullet_defs.append(m.group(1))
+            sides.append({"definition": m.group(1), "source": m.group(2)})
     if bullet_defs and len(bullet_defs) == len(body_nonempty):
-        note["definitions"] = bullet_defs
+        note["definitions"] = list(dict.fromkeys(bullet_defs))
+        note["sides"] = sides
     elif body:
         note["definitions"] = [body]
     else:
@@ -824,11 +1002,6 @@ def parse_note_md(text: str) -> dict | None:
     note.setdefault("status", "single-source")
     note.setdefault("facets", {})
     return note
-
-
-def _note_render_hash(note: dict) -> str:
-    import hashlib
-    return hashlib.sha256(render_note_md(note).encode("utf-8")).hexdigest()
 
 
 def render_glossary_md(notes: list[dict]) -> str:
@@ -907,11 +1080,37 @@ def render_relations_md(graph: dict, notes_by_id: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def skill_name_for(slug: str) -> str:
+    """A host-valid skill name (lowercase ASCII letters, digits, hyphens,
+    at most 64): the slug when it already is one, else a stable ASCII
+    form of it."""
+    if re.fullmatch(r"[a-z0-9-]{1,64}", slug or ""):
+        return slug
+    digest = hashlib.sha256((slug or "").encode("utf-8")).hexdigest()[:8]
+    ascii_part = re.sub(r"[^a-z0-9]+", "-", (slug or "").encode(
+        "ascii", "ignore").decode().lower()).strip("-")[:40]
+    return f"master-{ascii_part + '-' if ascii_part else ''}{digest}"
+
+
 def render_skill_md(field: str, notes: list[dict], conflicts: list[dict],
                     cross_index: list[dict], sources: list[dict],
-                    version: int) -> str:
+                    version: int, slug: str | None = None,
+                    masters_root: Path | None = None) -> str:
     consensus = [n for n in notes if n["status"] == "consensus"]
+    slug = slug or slugify(field)
+    name = skill_name_for(slug)
+    root = str(masters_root) if masters_root is not None else "<masters-root>"
+    description = (
+        f"Master knowledge skill for {field}: {len(notes)} atomic notes from "
+        f"{len(sources)} source(s), every claim cited, disagreements kept as "
+        f"contested. Use when a question is about {field}; rank notes with "
+        f"the ATOM query command before reading any note.")
+    description = description.replace('"', "'")[:1000]
     lines = [
+        "---",
+        f"name: {name}",
+        f'description: "{description}"',
+        "---", "",
         f"# Master skill - {field}", "",
         f"Version: {version}",
         "Unified mental models for this field, synthesized from the sources "
@@ -949,7 +1148,12 @@ def render_skill_md(field: str, notes: list[dict], conflicts: list[dict],
     if not cross_index:
         lines.append("No chapter topic appears in more than one source yet.")
     lines += ["", "## How to use this master skill",
-              "- Read taxonomy.md to navigate by area, then open the note.",
+              "- Answer a question by ranking notes first (cheapest path):",
+              f'  `python3 <atom skill dir>/scripts/build_master.py --masters-root "{root}" '
+              f'--question "<question>" --top 5`, then open notes/<id>.md of the hits.',
+              "  With a compact build, add `--compact-dir <dir>` instead of reading files.",
+              "- No hit above the threshold means the master does not hold the answer: say so.",
+              "- Read taxonomy.md only to browse by area; it is large.",
               "- Filter notes by facet (topic, technique, level, source_type).",
               "- Check relations.md / graph.json for typed links between concepts.",
               "- For any contested concept, read both sides before deciding.",
@@ -980,9 +1184,22 @@ def master_dir_for(masters_root: Path, field: str) -> Path:
 
 def load_master(master_dir: Path) -> dict | None:
     """Load an existing master. notes/*.md files are authoritative when
-    present (hand edits survive); master.json is the fallback index."""
+    present (hand edits survive); master.json is the fallback index.
+
+    The notes the last build itself wrote (from master.json) are kept
+    under ``_built_notes`` so a fold-in can tell a hand edit or a
+    hand-added note apart from builder output; that key is never written
+    back to disk.
+    """
     master_dir = Path(master_dir)
     notes_dir = master_dir / "notes"
+    manifest_path = master_dir / "master.json"
+    manifest: dict | None = None
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            manifest = None
     notes: list[dict] = []
     if notes_dir.is_dir():
         for path in sorted(notes_dir.glob("*.md")):
@@ -990,22 +1207,56 @@ def load_master(master_dir: Path) -> dict | None:
             if note is not None:
                 notes.append(note)
     if notes:
-        manifest_path = master_dir / "master.json"
-        manifest = {}
-        if manifest_path.exists():
-            try:
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except (ValueError, OSError):
-                manifest = {}
+        manifest = dict(manifest or {})
+        if "notes" in manifest:
+            manifest["_built_notes"] = [
+                {"id": n.get("id", ""), "title": n.get("title", ""),
+                 "body": n.get("body", "")}
+                for n in (manifest.get("notes") or [])]
         manifest["notes"] = notes
         return manifest
-    manifest_path = master_dir / "master.json"
-    if manifest_path.exists():
-        try:
-            return json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
-            return None
-    return None
+    return manifest
+
+
+def _legacy_contested_body(note: dict) -> str:
+    """The contested body older builds wrote (definitions zipped with
+    citations by index). A note still carrying exactly that text was not
+    edited by hand, only rendered by the old, misattributing code."""
+    return "\n".join(f"- {d} (source: {c})"
+                     for d, c in zip(note.get("definitions", []),
+                                     note.get("sources", [])))
+
+
+def _norm_body(text: str) -> str:
+    return "\n".join(line.rstrip() for line in (text or "").strip().splitlines())
+
+
+def _was_hand_edited(old: dict, generated: dict | None,
+                     built_body: str | None) -> bool:
+    """Did a person change this note's body since the builder wrote it?
+
+    Compared against what the builder produces from the OLD sources
+    (re-merged now, in both the current and the pre-fix contested format)
+    and against the body master.json recorded. With neither reference a
+    differing body is kept: the safe default.
+    """
+    body = _norm_body(old.get("body", ""))
+    if not body:
+        return False
+    refs = []
+    if generated is not None:
+        refs += [generated.get("body", ""), _legacy_contested_body(generated)]
+    if built_body is not None:
+        refs.append(built_body)
+    if not refs:
+        return True
+    return body not in {_norm_body(r) for r in refs}
+
+
+def _write_atomically(path: Path, text: str) -> None:
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def build_master(field: str, sources: list[dict], masters_root: Path,
@@ -1035,19 +1286,81 @@ def build_master(field: str, sources: list[dict], masters_root: Path,
             all_sources.append(src)
     merged = merge_sources(all_sources)
     notes = merged["notes"]
-    # Preserve hand-edited note bodies from an existing master: a note whose
-    # title matches an existing note keeps the existing body when the
-    # existing note was loaded from notes/*.md (the authoritative form).
+    hand_edited: list[str] = []
+    review: list[str] = []
+    kept_manual: list[str] = []
     if existing:
+        # What the builder produced last time, re-derived from the old
+        # sources: a note body equal to it is builder output and takes the
+        # new merge (a corrected or newly contested definition shows up);
+        # a body that differs was edited by hand and is kept.
+        old_generated: dict[str, dict] = {}
+        if any(src.get("glossary") or src.get("patterns")
+               for src in existing.get("sources", [])):
+            for n in merge_sources(existing.get("sources", []))["notes"]:
+                old_generated[normalize_title(n["title"])] = n
+        built_notes = existing.get("_built_notes")
+        built = {normalize_title(n.get("title", "")): n
+                 for n in built_notes or []}
+        built_ids = {n.get("id") for n in built_notes or []}
         existing_by_title = {normalize_title(n["title"]): n
                              for n in existing.get("notes", [])}
+        merged_titles = {normalize_title(n["title"]) for n in notes}
         for note in notes:
-            old = existing_by_title.get(normalize_title(note["title"]))
-            if old is not None and old.get("body") and old["body"] != note["body"]:
-                # Only keep a hand edit when it is not just the old merged
-                # body: a body that mentions a source the merge no longer
-                # lists, or text the merge never produced, counts as edited.
-                note["body"] = old["body"]
+            key = normalize_title(note["title"])
+            old = existing_by_title.get(key)
+            if old is None or not old.get("body"):
+                continue
+            built_body = built[key]["body"] if key in built else None
+            old_gen = old_generated.get(key)
+            if old_gen is not None:
+                # Facets and typed links edited by hand survive too: a
+                # facet that differs from what the old sources gave, and a
+                # link the old sources never produced, were set by a person.
+                old_facets = old.get("facets") or {}
+                if old_facets and old_facets != old_gen.get("facets"):
+                    note["facets"] = dict(old_facets)
+                    if note["title"] not in hand_edited:
+                        hand_edited.append(note["title"])
+                generated_links = {(lk.get("to"), lk.get("type"))
+                                   for lk in old_gen.get("links", [])}
+                current_links = {(lk.get("to"), lk.get("type"))
+                                 for lk in note.get("links", [])}
+                for link in old.get("links", []):
+                    pair = (link.get("to"), link.get("type"))
+                    if pair not in generated_links and pair not in current_links:
+                        note.setdefault("links", []).append(dict(link))
+                        current_links.add(pair)
+                        if note["title"] not in hand_edited:
+                            hand_edited.append(note["title"])
+            if not _was_hand_edited(old, old_gen, built_body):
+                continue
+            if _norm_body(note["body"]) != _norm_body(old["body"]) and (
+                    old_gen is None
+                    or old_gen.get("sources") != note["sources"]
+                    or old_gen.get("status") != note["status"]):
+                # The sources under a hand-edited note changed: the edit
+                # wins, but say so, so a person re-reads it.
+                review.append(note["title"])
+            note["body"] = old["body"]
+            note["hand_edited"] = True
+            if note["title"] not in hand_edited:
+                hand_edited.append(note["title"])
+        # Notes a person added by hand (never written by a build) are
+        # kept; notes an earlier build wrote whose concept no source gives
+        # any more are dropped as stale.
+        for old in existing.get("notes", []):
+            key = normalize_title(old.get("title", ""))
+            if key in merged_titles or old.get("id") in built_ids:
+                continue
+            kept = dict(old)
+            kept.setdefault("facets", {})
+            kept.setdefault("links", [])
+            kept.setdefault("sources", [])
+            kept.setdefault("source_keys", [])
+            kept["manual"] = True
+            notes.append(kept)
+            kept_manual.append(kept.get("title", ""))
     taxonomy_nodes = build_taxonomy(
         notes, all_sources, manifest_taxonomy,
         existing_nodes=existing.get("taxonomy") if existing else None)
@@ -1074,28 +1387,6 @@ def build_master(field: str, sources: list[dict], masters_root: Path,
                                     "field": entry.get("field", ""),
                                     "path": entry.get("path", "")})
 
-    notes_dir = out_dir / "notes"
-    notes_dir.mkdir(parents=True, exist_ok=True)
-    for path in notes_dir.glob("*.md"):
-        path.unlink()
-    for note in notes:
-        (notes_dir / f"{note['id']}.md").write_text(
-            render_note_md(note), encoding="utf-8")
-    notes_by_id = {n["id"]: n for n in notes}
-    (out_dir / "glossary.md").write_text(render_glossary_md(notes), encoding="utf-8")
-    (out_dir / "patterns.md").write_text(render_patterns_md(notes), encoding="utf-8")
-    (out_dir / "taxonomy.md").write_text(
-        render_taxonomy_md(field, taxonomy_nodes), encoding="utf-8")
-    (out_dir / "relations.md").write_text(
-        render_relations_md(graph, notes_by_id), encoding="utf-8")
-    (out_dir / "graph.json").write_text(
-        json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
-    (out_dir / "cross-field-links.md").write_text(
-        render_cross_field_links_md(cross_links), encoding="utf-8")
-    (out_dir / "SKILL.md").write_text(
-        render_skill_md(field, notes, merged["conflicts"],
-                        merged["cross_index"], all_sources, version),
-        encoding="utf-8")
     manifest = {
         "field": field, "slug": own_slug, "version": version,
         "updated_at": updated_at, "sources": all_sources,
@@ -1105,8 +1396,21 @@ def build_master(field: str, sources: list[dict], masters_root: Path,
         "unresolved_relations": merged["unresolved_relations"],
         "cross_field_links": cross_links,
     }
-    (out_dir / "master.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    notes_by_id = {n["id"]: n for n in notes}
+    files = {
+        "glossary.md": render_glossary_md(notes),
+        "patterns.md": render_patterns_md(notes),
+        "taxonomy.md": render_taxonomy_md(field, taxonomy_nodes),
+        "relations.md": render_relations_md(graph, notes_by_id),
+        "graph.json": json.dumps(graph, indent=2, ensure_ascii=False),
+        "cross-field-links.md": render_cross_field_links_md(cross_links),
+        "SKILL.md": render_skill_md(field, notes, merged["conflicts"],
+                                    merged["cross_index"], all_sources,
+                                    version, slug=own_slug,
+                                    masters_root=masters_root),
+        "master.json": json.dumps(manifest, indent=2, ensure_ascii=False),
+    }
+    _swap_in_master_dir(out_dir, notes, files)
     update_registry(masters_root, {
         "field": field, "slug": own_slug,
         "sources": [s.get("name", "") for s in all_sources],
@@ -1119,7 +1423,51 @@ def build_master(field: str, sources: list[dict], masters_root: Path,
             "version": version, "concept_count": len(notes),
             "contested_count": len(merged["conflicts"]),
             "cross_field_links": len(cross_links),
-            "unresolved_relations": len(merged["unresolved_relations"])}
+            "unresolved_relations": len(merged["unresolved_relations"]),
+            "hand_edited": hand_edited,
+            "hand_edited_needing_review": review,
+            "kept_manual_notes": kept_manual}
+
+
+def _swap_in_master_dir(out_dir: Path, notes: list[dict],
+                        files: dict[str, str]) -> None:
+    """Write a whole master next to the old one, then swap it in.
+
+    The old directory is copied first so files the builder does not own
+    (a manifest, a person's own notes file) carry over; notes/ is rebuilt
+    from scratch. A failure before the swap leaves the old master
+    untouched. The previous version stays as ``.<slug>.prev`` beside it:
+    one step of undo.
+    """
+    out_dir = Path(out_dir)
+    parent = out_dir.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    tmp = parent / f".{out_dir.name}.tmp-{os.getpid()}"
+    prev = parent / f".{out_dir.name}.prev"
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    try:
+        if out_dir.is_dir():
+            shutil.copytree(out_dir, tmp, symlinks=True)
+            if (tmp / "notes").exists():
+                shutil.rmtree(tmp / "notes")
+        else:
+            tmp.mkdir()
+        notes_dir = tmp / "notes"
+        notes_dir.mkdir()
+        for note in notes:
+            (notes_dir / f"{note['id']}.md").write_text(
+                render_note_md(note), encoding="utf-8")
+        for name, text in files.items():
+            (tmp / name).write_text(text, encoding="utf-8")
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    if prev.exists():
+        shutil.rmtree(prev)
+    if out_dir.exists():
+        os.replace(out_dir, prev)
+    os.replace(tmp, out_dir)
 
 
 def read_registry(masters_root: Path) -> dict:
@@ -1141,8 +1489,9 @@ def update_registry(masters_root: Path, entry: dict) -> dict:
                            if m.get("slug") != entry["slug"]]
     registry["masters"].append(entry)
     registry["masters"].sort(key=lambda m: m.get("field", ""))
-    (masters_root / "index.json").write_text(
-        json.dumps(registry, indent=2, ensure_ascii=False), encoding="utf-8")
+    masters_root.mkdir(parents=True, exist_ok=True)
+    _write_atomically(masters_root / "index.json",
+                      json.dumps(registry, indent=2, ensure_ascii=False))
     return registry
 
 
@@ -1169,38 +1518,59 @@ def query_across_masters(masters_root: Path, status: str | None = None,
     return results
 
 
+_GLOSSARY_LINE = re.compile(
+    r"^(?:[-*]\s+)?\*\*(?P<term>.+?)\*\*\s*(?:[:\u2014\u2013]|-{1,2})\s*(?P<text>.*?)"
+    r"(?:\s*\((?P<ch>(?:ch|chapter)\.?\s*[^)]*)\))?\s*$", re.IGNORECASE)
+
+
 def parse_skill_dir(skill_dir: Path) -> dict:
     """Best-effort parse of an existing skill directory into a source dict.
 
-    Reads glossary.md ("- **Term**: definition" or "## Term" sections) and
-    patterns.md the same way, plus chapter titles from SKILL.md's chapter
-    index table when present. Anything it cannot parse is skipped, never
-    invented.
+    glossary.md: "**Term** — definition (Ch N)" (the format SKILL.md Step 8
+    asks for) and "- **Term**: definition" both work. patterns.md: each
+    "## Name" section, its lines kept as the description. Chapter titles
+    come from SKILL.md's chapter index table. Anything it cannot parse is
+    skipped, never invented.
     """
     skill_dir = Path(skill_dir)
-    name = skill_dir.name
-    source: dict = {"name": name, "kind": "book", "glossary": [],
+    source: dict = {"name": skill_dir.name, "kind": "book", "glossary": [],
                     "patterns": [], "chapters": []}
-    for filename, key, text_key in (("glossary.md", "glossary", "definition"),
-                                    ("patterns.md", "patterns", "description")):
-        path = skill_dir / filename
-        if not path.exists():
-            continue
-        current: dict | None = None
+    path = skill_dir / "glossary.md"
+    if path.exists():
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            m = re.match(r"-\s+\*\*(.+?)\*\*:\s*(.*)$", line.strip())
+            m = _GLOSSARY_LINE.match(line.strip())
+            if m and m.group("text"):
+                item = {"term": m.group("term").strip(),
+                        "definition": m.group("text").strip()}
+                if m.group("ch"):
+                    item["chapter"] = re.sub(r"^(?:ch|chapter)\.?\s*", "",
+                                             m.group("ch"), flags=re.I).strip()
+                source["glossary"].append(item)
+    path = skill_dir / "patterns.md"
+    if path.exists():
+        current: dict | None = None
+        body: list[str] = []
+
+        def flush() -> None:
+            if current is not None:
+                current["description"] = " ".join(
+                    ln.strip() for ln in body if ln.strip())
+                source["patterns"].append(current)
+
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            m = re.match(r"^##\s+(.+?)(?:\s+\[.*\])?\s*$", line)
             if m:
-                current = {("term" if key == "glossary" else "name"): m.group(1),
-                           text_key: m.group(2)}
-                source[key].append(current)
+                flush()
+                current, body = {"name": m.group(1).strip()}, []
                 continue
-            m2 = re.match(r"##\s+(.+?)(?:\s+\[.*\])?\s*$", line.strip())
-            if m2 and not line.strip().startswith("## "):
-                continue
-            if m2:
-                current = {("term" if key == "glossary" else "name"): m2.group(1),
-                           text_key: ""}
-                source[key].append(current)
+            if current is not None and not line.startswith("# "):
+                body.append(line)
+            elif current is None:
+                gm = _GLOSSARY_LINE.match(line.strip())
+                if gm and gm.group("text"):
+                    source["patterns"].append({"name": gm.group("term").strip(),
+                                               "description": gm.group("text").strip()})
+        flush()
     skill_md = skill_dir / "SKILL.md"
     if skill_md.exists():
         for line in skill_md.read_text(encoding="utf-8", errors="replace").splitlines():

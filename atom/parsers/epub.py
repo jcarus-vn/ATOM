@@ -7,7 +7,9 @@ import sys
 import zipfile
 from urllib.parse import unquote, urlsplit
 
-from atom.parsers.html import _HTMLTextExtractor
+from atom.exceptions import ExtractionError
+from atom.parsers.html import _HTMLTextExtractor, soup_text
+from atom.parsers.zip_limits import check_zip_limits
 
 
 _IMAGE_EXTENSIONS = (
@@ -43,6 +45,11 @@ def extract_with_ebooklib(epub_path: str) -> str | None:
         from ebooklib import epub
         from bs4 import BeautifulSoup
 
+        try:
+            with zipfile.ZipFile(epub_path) as zf:
+                check_zip_limits(zf, "EPUB")
+        except (OSError, zipfile.BadZipFile):
+            pass  # unreadable archive: ebooklib reports it below
         book = epub.read_epub(epub_path)
         documents = list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
         ordered_items = []
@@ -67,10 +74,14 @@ def extract_with_ebooklib(epub_path: str) -> str | None:
         parts = []
         for item in ordered_items:
             soup = BeautifulSoup(item.get_content(), "html.parser")
-            parts.append(soup.get_text(separator="\n"))
+            for skip in soup(["script", "style", "head"]):
+                skip.decompose()
+            parts.append(soup_text(soup))
         return "\n\n".join(parts)
     except ImportError:
         return None
+    except ExtractionError:
+        raise
     except Exception as e:
         print(f"  [warn] extract_with_ebooklib failed: {type(e).__name__}: {e}", file=sys.stderr)
         return None
@@ -111,6 +122,7 @@ def extract_with_zipfile(epub_path: str) -> str | None:
     """stdlib-only EPUB extractor: unzip → parse HTML files."""
     try:
         with zipfile.ZipFile(epub_path) as zf:
+            check_zip_limits(zf, "EPUB")
             names = zf.namelist()
 
             # Locate OPF and determine its directory for resolving relative hrefs
@@ -171,6 +183,8 @@ def extract_with_zipfile(epub_path: str) -> str | None:
                 except Exception:
                     continue
             return "\n\n".join(parts) if parts else None
+    except ExtractionError:
+        raise
     except Exception as e:
         print(f"  [warn] extract_with_zipfile failed: {type(e).__name__}: {e}", file=sys.stderr)
         return None

@@ -91,6 +91,15 @@ def main() -> int:
           f"({taxonomy_hits / n:.0%}), avg tokens "
           f"{tax_tokens / max(taxonomy_hits, 1):.0f} "
           f"(index amortized + 1 note)")
+    # The amortized figure assumes the index stays in context for every
+    # question of the run. A fresh session pays the whole index once.
+    avg_note = (tax_tokens / max(taxonomy_hits, 1)
+                - taxonomy_index_tokens // max(len(questions), 1))
+    print(f"taxonomy lookup, first question of a session (index not amortized): "
+          f"{taxonomy_index_tokens + avg_note:.0f} tokens "
+          f"(index {taxonomy_index_tokens} + 1 note)")
+    print("token counts: words/0.75 heuristic; real BPE counts run higher on "
+          "URLs, code and non-English text")
     return 0
 
 

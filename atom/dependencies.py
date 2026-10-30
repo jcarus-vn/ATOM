@@ -146,13 +146,19 @@ def install_python_packages(packages: list[str]) -> bool:
     return result.returncode == 0
 
 
+# Values --install-missing accepts. Anything else after the flag is the
+# next argument (an input path), not the flag's value.
+INSTALL_MODE_WORDS = frozenset({"ask", "1", "true", "y", "yes", "install",
+                                "0", "false", "n", "no", "fallback", "skip"})
+
+
 def normalize_install_mode(argv: list[str]) -> str:
     mode = os.environ.get("BOOK_SKILL_INSTALL_MISSING", "ask").lower()
     if "--no-install-missing" in argv:
         return "no"
     if "--install-missing" in argv:
         idx = argv.index("--install-missing")
-        if idx + 1 < len(argv) and not argv[idx + 1].startswith("--"):
+        if idx + 1 < len(argv) and argv[idx + 1].lower() in INSTALL_MODE_WORDS:
             mode = argv[idx + 1].lower()
         else:
             mode = "yes"

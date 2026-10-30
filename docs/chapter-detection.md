@@ -29,9 +29,11 @@ python3 scripts/extract.py book.pdf --chapter-mode toc
 python3 scripts/extract.py book.pdf --chapter-mode heuristic
 ```
 
-`metadata.json` records, per source and overall: `chapter_details`
-(title, page, strategy, confidence, strategies) and `chapter_detection`
-(mode, method, strategies_used, fallback). When the legacy count finds
+`chapters.json` (next to `metadata.json`) records the full
+`chapter_details` (title, page, strategy, confidence, strategies), overall
+and per source. `metadata.json` keeps a summary: the first 60 entries,
+`chapter_details_total`, and `chapter_detection` (mode, method,
+strategies_used, fallback). When the legacy count finds
 fewer than two chapters but the flexible detector finds at least two,
 the flexible count wins and `chapters_method` becomes "flexible".
 
