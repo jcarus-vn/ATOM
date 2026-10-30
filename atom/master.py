@@ -1086,7 +1086,7 @@ def skill_name_for(slug: str) -> str:
     form of it."""
     if re.fullmatch(r"[a-z0-9-]{1,64}", slug or ""):
         return slug
-    digest = hashlib.sha1((slug or "").encode("utf-8")).hexdigest()[:8]
+    digest = hashlib.sha256((slug or "").encode("utf-8")).hexdigest()[:8]
     ascii_part = re.sub(r"[^a-z0-9]+", "-", (slug or "").encode(
         "ascii", "ignore").decode().lower()).strip("-")[:40]
     return f"master-{ascii_part + '-' if ascii_part else ''}{digest}"
