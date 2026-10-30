@@ -41,9 +41,9 @@ Measured on this machine (tesseract 5.3.4, clean synthetic renders,
 with no CER change, so the default stays at 200 dpi. Page segmentation was
 measured again with tools/eval_ocr.py (2026-10-30): one-column pages read
 the same under PSM 3 and 6, but PSM 6 reads two-column pages across both
-columns and PSM 3 reads a full-page table column by column. Scanned pages
-therefore use PSM 3 with a PSM 6 fallback for tables (``ocr_page_bytes``);
-figures keep PSM 6.
+columns and PSM 3 cuts tables and some lists into false columns. Scanned
+pages therefore use PSM 3, with a PSM 6 re-read when its side-by-side
+blocks are not real columns (``ocr_page_bytes``); figures keep PSM 6.
 """
 
 from __future__ import annotations
@@ -214,29 +214,94 @@ def ocr_image_bytes(data: bytes, lang: str | None = None,
 # Page segmentation for scanned pages. PSM 3 (tesseract's automatic
 # layout) reads a page set in two columns column by column, where PSM 6
 # (one uniform block) joins the left and right line into one. PSM 3 in turn
-# splits a full-page table into its columns, which PSM 6 reads row by row.
-# So pages go through PSM 3 first, and a page that comes back as mostly
-# one- to three-word lines (the sign of a table cut into columns) is read
-# again with PSM 6. Measured with tools/eval_ocr.py; see docs/ocr-figures.md.
+# cuts some one-column pages into side-by-side blocks that are not columns:
+# a table split into its columns, or lines that share a repeated first
+# word split after it. Such blocks are narrow or sit a word-space apart,
+# while real columns are wide and separated by a gutter. A page whose
+# side-by-side blocks all look like the former is read again with PSM 6.
+# Measured with tools/eval_ocr.py; see docs/ocr-figures.md.
 PAGE_PSM = 3
 TABLE_PSM = 6
-TABLE_MAX_WORDS_PER_LINE = 3
-TABLE_MIN_LINES = 8
+COLUMN_MIN_WIDTH = 0.25      # of the page's text width
+COLUMN_MIN_GUTTER = 1.0      # in median word heights
 
 
-def _median_words_per_line(text: str) -> tuple[int, int]:
-    """(median words per non-empty line, number of such lines)."""
-    counts = sorted(len(ln.split()) for ln in text.splitlines() if ln.strip())
-    if not counts:
-        return 0, 0
-    return counts[len(counts) // 2], len(counts)
+def _ocr_with_layout(data: bytes, lang: str, timeout: int,
+                     psm: int) -> tuple[str, str] | None:
+    """(plain text, TSV) from one tesseract run, or None on failure."""
+    with tempfile.TemporaryDirectory(prefix="atom_ocr_") as tmp:
+        base = os.path.join(tmp, "page")
+        try:
+            result = subprocess.run(
+                ["tesseract", "stdin", base, "--psm", str(psm), "-l", lang, "txt", "tsv"],
+                input=data, capture_output=True, timeout=timeout,
+            )
+        except Exception as exc:
+            _warn(f"tesseract failed: {type(exc).__name__}: {exc}")
+            return None
+        if getattr(result, "returncode", 0) != 0:
+            _warn("tesseract exited non-zero; page treated as unread")
+            return None
+        try:
+            with open(base + ".txt", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+            with open(base + ".tsv", encoding="utf-8", errors="replace") as fh:
+                tsv = fh.read()
+        except OSError:
+            return None
+    return text, tsv
 
 
-def _looks_like_split_table(text: str) -> bool:
-    """True when most lines hold three words or fewer (a table read
-    column by column), over enough lines to judge."""
-    median, lines = _median_words_per_line(text)
-    return lines >= TABLE_MIN_LINES and median <= TABLE_MAX_WORDS_PER_LINE
+def _text_blocks(tsv: str) -> tuple[list[tuple[int, int, int, int]], float, float]:
+    """Blocks that hold words as (left, top, right, bottom), the text width
+    of the page, and the median word height."""
+    boxes: dict[int, list[int]] = {}
+    blocks_with_words: set[int] = set()
+    lefts, rights, heights = [], [], []
+    for row in tsv.splitlines()[1:]:
+        cols = row.split("\t")
+        if len(cols) < 11:
+            continue
+        try:
+            level, block = int(cols[0]), int(cols[2])
+            left, top, width, height = (int(c) for c in cols[6:10])
+        except ValueError:
+            continue
+        if level == 2:
+            boxes[block] = [left, top, left + width, top + height]
+        elif level == 5 and len(cols) > 11 and cols[11].strip():
+            blocks_with_words.add(block)
+            lefts.append(left)
+            rights.append(left + width)
+            heights.append(height)
+    if not heights:
+        return [], 0.0, 0.0
+    heights.sort()
+    found = [tuple(boxes[b]) for b in sorted(blocks_with_words) if b in boxes]
+    return found, float(max(rights) - min(lefts)), float(heights[len(heights) // 2])
+
+
+def _split_into_false_columns(tsv: str) -> bool:
+    """True when PSM 3 put blocks side by side and none of those pairs looks
+    like two real columns (both wide, a gutter between them)."""
+    blocks, text_width, word_h = _text_blocks(tsv)
+    if text_width <= 0:
+        return False
+    good = bad = False
+    for i, a in enumerate(blocks):
+        for b in blocks[i + 1:]:
+            left, right = (a, b) if a[0] <= b[0] else (b, a)
+            overlap = min(a[3], b[3]) - max(a[1], b[1])
+            shorter = min(a[3] - a[1], b[3] - b[1])
+            gap = right[0] - left[2]
+            if gap < 0 or shorter <= 0 or overlap < 0.5 * shorter:
+                continue
+            wide = min(a[2] - a[0], b[2] - b[0]) >= COLUMN_MIN_WIDTH * text_width
+            if wide and gap >= COLUMN_MIN_GUTTER * word_h:
+                good = True
+            else:
+                bad = True
+    return bad and not good
 
 
 def ocr_page_bytes(data: bytes, lang: str | None = None,
@@ -244,18 +309,25 @@ def ocr_page_bytes(data: bytes, lang: str | None = None,
     """OCR one rendered page so that two-column pages and tables both come
     out in reading order.
 
-    *psm* None (the default) reads with PSM 3 and falls back to PSM 6 when
-    the result looks like a table split into columns (a second tesseract
-    run, only on such pages). An explicit *psm* is used as is.
+    *psm* None (the default) reads with PSM 3 and reads again with PSM 6
+    when PSM 3 split the page into side-by-side blocks that are not real
+    columns (a second tesseract run, only on such pages). An explicit
+    *psm* is used as is.
     """
     if psm is not None:
         return ocr_image_bytes(data, lang=lang, timeout=timeout, psm=psm)
-    text = ocr_image_bytes(data, lang=lang, timeout=timeout, psm=PAGE_PSM)
-    if text and _looks_like_split_table(text):
-        rows = ocr_image_bytes(data, lang=lang, timeout=timeout, psm=TABLE_PSM)
-        if rows and _median_words_per_line(rows)[0] > _median_words_per_line(text)[0]:
+    if not shutil.which("tesseract") or not data:
+        return None
+    resolved = resolve_lang(lang)
+    first = _ocr_with_layout(data, resolved, timeout, PAGE_PSM)
+    if first is None:
+        return None
+    text, tsv = first
+    if _split_into_false_columns(tsv):
+        rows = ocr_image_bytes(data, lang=resolved, timeout=timeout, psm=TABLE_PSM)
+        if rows:
             return rows
-    return text
+    return text.strip() or None
 
 
 def ocr_image_file(path: str, lang: str | None = None,
