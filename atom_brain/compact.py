@@ -62,6 +62,7 @@ from atom_brain.master import (
     _rank_terms,
     _raw_terms,
     _title_match,
+    fuse_hybrid,
     fuse_rankings,
     normalize_title,
 )
@@ -771,7 +772,8 @@ def fetch_bodies(compact_dir: Path, note_ids: list[str]) -> dict[str, str]:
 def query_compact_dir(compact_dir: Path, question: str,
                       k: int | None = None, source: str | None = None,
                       params: dict | None = None,
-                      also: list[str] | None = None) -> list[dict]:
+                      also: list[str] | None = None,
+                      semantic: list[dict] | None = None) -> list[dict]:
     """Two-phase query over a compact directory.
 
     Phase 1 ranks from registry + index (no bodies). Phase 2 fetches
@@ -780,7 +782,9 @@ def query_compact_dir(compact_dir: Path, question: str,
     eval only reads bodies of the top-k; ids carry the full ranking
     for MRR). ``also`` adds other wordings of the question (e.g. a
     translation into the notes' language); their rankings are fused with
-    :func:`atom_brain.master.fuse_rankings`.
+    :func:`atom_brain.master.fuse_rankings`. ``semantic`` (note_id +
+    cosine entries from atom_brain.semantic.rank_semantic) is fused in by
+    rank with :func:`atom_brain.master.fuse_hybrid`.
     """
     compact_dir = Path(compact_dir)
     registry, index = load_compact_dir(compact_dir)
@@ -793,6 +797,8 @@ def query_compact_dir(compact_dir: Path, question: str,
     rankings = [rank_compact(index, q, k=None, source=source, params=params,
                              cite_texts=cite_texts) for q in wordings]
     ranked = rankings[0] if len(rankings) == 1 else fuse_rankings(rankings)
+    if semantic:
+        ranked = fuse_hybrid(ranked, semantic)
     top = ranked[:k] if k is not None and k > 0 else ranked
     bodies = fetch_bodies(compact_dir, [entry["note_id"] for entry in top])
     by_id = {entry["id"]: entry for entry in registry["notes"]}
@@ -803,7 +809,7 @@ def query_compact_dir(compact_dir: Path, question: str,
             note = expand_note_with_body(registry, by_id[note_id], bodies[note_id])
         else:
             note = {"id": note_id}
-        extra = {"fused": entry["fused"]} if "fused" in entry else {}
+        extra = {key: entry[key] for key in ("fused", "cosine") if key in entry}
         entries.append({
             **extra,
             "note": note,

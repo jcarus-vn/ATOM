@@ -13,7 +13,8 @@ stored there, not the notes/*.md re-parse) and writes:
 - ``SKILL.md``: copied verbatim when present.
 
 Names from the legacy dir's ``aliases.json`` are carried into the
-registry and the index, so a compact query matches them too.
+registry and the index, so a compact query matches them too. A semantic
+index (``embeddings.json`` + ``embeddings.f16``) is copied as is.
 
 The compact directory is a query artifact: it drops the raw source
 inputs (glossary/patterns items) that live in the per-source skill
@@ -70,9 +71,9 @@ def main() -> int:
     with (args.out_dir / "bodies.jsonl").open("w", encoding="utf-8") as handle:
         for row in build_bodies(compact, bodies):
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    skill_md = args.legacy_dir / "SKILL.md"
-    if skill_md.exists():
-        shutil.copyfile(skill_md, args.out_dir / "SKILL.md")
+    for name in ("SKILL.md", "embeddings.json", "embeddings.f16"):
+        if (args.legacy_dir / name).exists():
+            shutil.copyfile(args.legacy_dir / name, args.out_dir / name)
     print(f"compact master: {len(compact['notes'])} notes, "
           f"{len(compact['cites'])} citations factored, "
           f"{len(index['vocab'])} index terms -> {args.out_dir}")

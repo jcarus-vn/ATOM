@@ -179,6 +179,61 @@ Summing scores beat reciprocal rank fusion here (0.56 / 0.39 / 0.91
 for the translation column), because ranks give an unmatched wording's
 noise the same weight as real hits.
 
+## Semantic retrieval (experimental, off by default)
+
+Names and translations help a question that uses the concept's words.
+One that describes a concept in other words ("learning by trial and
+error") needs meaning, not words: compare question and notes as
+embeddings from a multilingual model. This is optional and **not yet
+measured on a real model**: the development environment could not
+download one. Its gate before it is recommended: Vietnamese "other
+wording" recall@5 at least 0.8 on the Robotics set, with English not
+below 0.88.
+
+1. `pip install "atom-brain[semantic]"` (onnxruntime, tokenizers, numpy;
+   the current onnxruntime needs Python 3.11+, older Pythons get an older
+   release).
+2. Put a model on disk yourself; ATOM never downloads one. The directory
+   needs an ONNX export (`model.onnx`, `model_quantized.onnx`, or either
+   under `onnx/`) and its `tokenizer.json`, e.g. an ONNX export of
+   `intfloat/multilingual-e5-small` (0.1B parameters, 384 dimensions,
+   about 470 MB, or about 120 MB quantized). Defaults follow E5's
+   `query: ` / `passage: ` prefixes; a different model can set
+   `query_prefix`, `passage_prefix` and `max_length` in an
+   `atom-embed.json` beside it.
+3. Index a master, then ask as usual:
+
+```bash
+python3 scripts/build_master.py --field "Robotics" --embed --embed-model ~/models/e5-small
+export ATOM_EMBED_MODEL=~/models/e5-small
+python3 scripts/build_master.py --question "Robot tự học bằng thử và sai là gì?" \
+    --also "What is learning by trial and error?"
+```
+
+The index is `embeddings.json` + `embeddings.f16` in the master directory
+(one float16 row per note: about 90 KB for 118 notes at 384 dimensions).
+Rebuilds keep it and say it may be stale; `--embed` recomputes only the
+notes whose text changed. `tools/build_compact.py` copies it, so
+`--compact-dir` queries use it too. The semantic ranking is fused with
+the word ranking by rank (reciprocal rank fusion), so it can only add
+candidates and reorder them; a hit with no word support is shown only
+when its cosine reaches `--min-cosine` (default 0.80, **uncalibrated**:
+cosine scales differ between models).
+
+Measure a model before trusting it:
+
+```bash
+python3 tools/eval_multilingual.py <master_dir> --embed-model ~/models/e5-small
+```
+
+It adds a "semantic" and an "all three" column and prints the cosine of
+each question's best gold note and best other note, to set `min_cosine`
+(store it in `embeddings.json` or pass `--min-cosine`). Fusion by rank
+gives a weak model's ranking as much weight as the word ranking: in a
+plumbing test with a toy model that knows almost no words, "all three"
+fell to about 0.36 on the Vietnamese set. A model that does not beat the
+"names + transl." column should not be enabled.
+
 ## Taxonomy lookup, measured
 
 `tools/eval_taxonomy_lookup.py <master-dir>` compares looking a
