@@ -30,6 +30,8 @@ Masters live under <masters-root>/<field-slug>/; the registry is
 Override with --masters-root or BOOK_SKILL_MASTERS_ROOT.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
