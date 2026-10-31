@@ -57,8 +57,11 @@ from atom_brain.master import (
     EXPANSION_SEEDS,
     GLOSSARY_BONUS,
     _DEFINITIONAL,
+    _alias_in_question,
+    _alias_units,
     _rank_terms,
     _raw_terms,
+    _title_match,
     normalize_title,
 )
 
@@ -227,6 +230,9 @@ def compact_master(master: dict) -> dict:
         definitions = note.get("definitions", [])
         if not (len(definitions) == 1 and definitions[0] == note.get("body", "")):
             entry["defs"] = definitions
+        for key in ("aliases", "topic_aliases"):
+            if note.get(key):
+                entry[key] = list(note[key])
         links = []
         for link in note.get("links", []):
             item = {"to": link.get("to", ""), "type": link.get("type", ""),
@@ -241,7 +247,7 @@ def compact_master(master: dict) -> dict:
 
     taxonomy = []
     for node in master.get("taxonomy", []):
-        taxonomy.append({
+        item = {
             "id": node.get("id", ""),
             "label": node.get("label", ""),
             "level": node.get("level", 0),
@@ -249,7 +255,10 @@ def compact_master(master: dict) -> dict:
             "status": node.get("status", ""),
             "manual": bool(node.get("manual", False)),
             "src": _encode_srcs(node.get("sources", []), cite_index),
-        })
+        }
+        if node.get("aliases"):
+            item["aliases"] = list(node["aliases"])
+        taxonomy.append(item)
 
     edges = []
     for edge in master.get("graph", {}).get("edges", []):
@@ -335,6 +344,9 @@ def _expand_note(compact: dict, entry: dict) -> dict:
         note["links"].append(item)
     if definitions is not None:
         note["definitions"] = definitions
+    for key in ("aliases", "topic_aliases"):
+        if entry.get(key):
+            note[key] = list(entry[key])
     return note
 
 
@@ -360,7 +372,7 @@ def expand_compact_master(compact: dict, bodies: dict[str, str]) -> dict:
         notes.append(expand_note_with_body(compact, entry, body))
     taxonomy = []
     for node in compact["taxonomy"]:
-        taxonomy.append({
+        item = {
             "id": node["id"],
             "label": node["label"],
             "level": node["level"],
@@ -368,7 +380,10 @@ def expand_compact_master(compact: dict, bodies: dict[str, str]) -> dict:
             "status": node["status"],
             "manual": node["manual"],
             "sources": _decode_srcs(node["src"], compact["cites"]),
-        })
+        }
+        if node.get("aliases"):
+            item["aliases"] = list(node["aliases"])
+        taxonomy.append(item)
     graph_nodes = []
     for note in notes:
         graph_nodes.append({
@@ -449,7 +464,8 @@ def fidelity_diff(original: dict, expanded: dict) -> list[str]:
         if exp is None:
             continue
         for field in ("title", "kind", "status", "facets", "body",
-                      "definitions", "sources", "source_keys", "links"):
+                      "definitions", "sources", "source_keys", "links",
+                      "aliases", "topic_aliases"):
             if orig.get(field) != exp.get(field):
                 problems.append(f"note {note_id} field {field} differs")
     orig_tax = {n["id"]: n for n in original.get("taxonomy", [])}
@@ -460,7 +476,8 @@ def fidelity_diff(original: dict, expanded: dict) -> list[str]:
         exp = exp_tax.get(node_id)
         if exp is None:
             continue
-        for field in ("label", "level", "parents", "status", "manual", "sources"):
+        for field in ("label", "level", "parents", "status", "manual", "sources",
+                      "aliases"):
             if orig.get(field) != exp.get(field):
                 problems.append(f"taxonomy {node_id} field {field} differs")
     orig_nodes = {n["id"]: n for n in original.get("graph", {}).get("nodes", [])}
@@ -526,7 +543,8 @@ def build_index(compact: dict, bodies: dict[str, str]) -> dict:
     # string-key lookup on citation-shaped data).
     tax_map: dict[str, list[int]] = {}
     for node in compact["taxonomy"]:
-        label_terms = sorted({_term_id(t) for t in _rank_terms(node["label"])})
+        label_text = " ".join([node["label"]] + node.get("aliases", []))
+        label_terms = sorted({_term_id(t) for t in _rank_terms(label_text)})
         for cite_id, _chapter in node["src"]:
             url = compact["cites"][cite_id]["url"]
             merged = sorted(set(tax_map.get(url, [])) | set(label_terms))
@@ -555,10 +573,16 @@ def build_index(compact: dict, bodies: dict[str, str]) -> dict:
         source_urls = sorted({
             compact["cites"][cite_id]["url"] for cite_id, _chapter in entry["src"]
         })
+        topic_text = " ".join([facets.get("topic", "")]
+                              + entry.get("topic_aliases", []))
+        aliases = entry.get("aliases", [])
         notes_meta.append({
             "id": entry["id"],
             "title_terms": sorted({_term_id(t) for t in _rank_terms(title)}),
-            "topic_terms": sorted({_term_id(t) for t in _rank_terms(facets.get("topic", ""))}),
+            "topic_terms": sorted({_term_id(t) for t in _rank_terms(topic_text)}),
+            "aliases": aliases,
+            "alias_units": [sorted({_term_id(u) for u in _alias_units(a)})
+                            for a in aliases],
             "title_norm": normalize_title(title),
             "acronym": acronym,
             "kind": entry["kind"],
@@ -627,6 +651,8 @@ def rank_compact(index: dict, question: str, k: int | None = None,
     qterms = set(_rank_terms(question))
     vocab_lookup = {term: i for i, term in enumerate(vocab)}
     qterm_ids = {vocab_lookup[t] for t in qterms if t in vocab_lookup}
+    qunit_ids = {vocab_lookup[u] for u in _alias_units(question, query=True)
+                 if u in vocab_lookup}
     qnorm = normalize_title(question)
     qraw = set(_raw_terms(question))
     definitional = bool(qraw & _DEFINITIONAL)
@@ -655,8 +681,9 @@ def rank_compact(index: dict, question: str, k: int | None = None,
     for ordinal in pool:
         meta = notes_meta[ordinal]
         title_terms = set(meta["title_terms"])
-        title_hits = len(qterm_ids & title_terms)
-        coverage = title_hits / len(title_terms) if title_terms else 0.0
+        title_hits, coverage = _title_match(
+            qterm_ids, qunit_ids, title_terms,
+            [set(units) for units in meta.get("alias_units", [])])
         tax_terms: set[int] = set()
         for url in meta["source_urls"]:
             tax_terms.update(tax_map.get(url, []))
@@ -666,6 +693,8 @@ def rank_compact(index: dict, question: str, k: int | None = None,
         if meta["title_norm"] and meta["title_norm"] in qnorm:
             concept = 1.0
         elif meta["acronym"] and meta["acronym"] in qnorm:
+            concept = 1.0
+        elif _alias_in_question(meta.get("aliases", []), qnorm):
             concept = 1.0
         glossary = 1.0 if (definitional and meta["kind"] == "glossary") else 0.0
         score = (3 * title_hits

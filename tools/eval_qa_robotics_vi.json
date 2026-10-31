@@ -1,0 +1,115 @@
+{
+  "about": "Vietnamese versions of the 22 Robotics gold questions (dev + holdout), keyed by question id. vi: standard Vietnamese terms; vi_alt: the same question worded to avoid those terms; vi_mixed: Vietnamese with the English technical terms kept, as engineers often ask. Machine-written (by an AI), not by a native reader: replace or extend with questions a person writes before trusting small differences.",
+  "questions": {
+    "slam-definition": {
+      "vi": "SLAM là gì, và nó được chia thành front-end và back-end như thế nào?",
+      "vi_alt": "Bài toán định vị và xây dựng bản đồ đồng thời là gì, gồm những khối xử lý nào?",
+      "vi_mixed": "SLAM là gì, front-end và back-end làm gì?"
+    },
+    "slam-drift-loop-closure": {
+      "vi": "SLAM sửa sai số trôi tích lũy thế nào khi robot quay lại một nơi đã đi qua?",
+      "vi_alt": "Khi robot đi vòng về chỗ cũ, làm sao khử được sai số tích lũy của bản đồ?",
+      "vi_mixed": "Loop closure trong SLAM sửa drift như thế nào?"
+    },
+    "ekf-vs-factorgraph-slam": {
+      "vi": "EKF-SLAM khác SLAM dùng đồ thị nhân tử ở khả năng mở rộng và cách đặt bài toán ra sao?",
+      "vi_alt": "So sánh SLAM theo bộ lọc Kalman mở rộng với SLAM tối ưu đồ thị về độ phức tạp khi bản đồ lớn.",
+      "vi_mixed": "EKF-SLAM với factor graph SLAM khác nhau gì khi scale lên?"
+    },
+    "motion-planning-definition": {
+      "vi": "Lập kế hoạch chuyển động là gì, và nó suy luận trong không gian nào?",
+      "vi_alt": "Hoạch định chuyển động cho robot là gì, và bài toán được đặt trong không gian nào?",
+      "vi_mixed": "Motion planning là gì, nó làm việc trong configuration space hay không gian nào?"
+    },
+    "rrt-vs-prm": {
+      "vi": "RRT và PRM khác nhau thế nào khi là bộ lập kế hoạch chuyển động dựa trên lấy mẫu?",
+      "vi_alt": "Cây ngẫu nhiên mở rộng nhanh và bản đồ đường đi xác suất khác nhau ra sao?",
+      "vi_mixed": "RRT và PRM khác nhau thế nào trong sampling-based planning?"
+    },
+    "plan-then-refine": {
+      "vi": "Lập kế hoạch chuyển động và tối ưu quỹ đạo phối hợp với nhau như thế nào?",
+      "vi_alt": "Tìm đường đi trước rồi tối ưu hóa quỹ đạo sau thì có lợi gì?",
+      "vi_mixed": "Motion planning và trajectory optimization kết hợp với nhau ra sao?"
+    },
+    "see-think-act": {
+      "vi": "Các giai đoạn Nhìn - Nghĩ - Hành động trong tự hành của robot là gì?",
+      "vi_alt": "Chu trình cảm nhận, suy nghĩ, hành động của robot tự hành gồm những bước nào?",
+      "vi_mixed": "See-Think-Act trong robot autonomy gồm những gì?"
+    },
+    "bayes-vs-kalman": {
+      "vi": "Bộ lọc Bayes liên quan thế nào đến bộ lọc Kalman, và EKF, UKF mở rộng nó ra sao?",
+      "vi_alt": "Lọc Kalman có phải là trường hợp riêng của lọc Bayes không, còn Kalman mở rộng và Kalman không mùi thì sao?",
+      "vi_mixed": "Bayes filter liên quan gì tới Kalman filter, EKF và UKF mở rộng thế nào?"
+    },
+    "parametric-vs-nonparametric": {
+      "vi": "Đánh đổi giữa bộ lọc ước lượng trạng thái tham số và phi tham số là gì?",
+      "vi_alt": "Nên dùng bộ lọc có tham số hay bộ lọc hạt để ước lượng trạng thái?",
+      "vi_mixed": "Trade-off giữa parametric filter và non-parametric filter là gì?"
+    },
+    "rl-vs-imitation": {
+      "vi": "Khi nào robot nên học từ tương tác (học tăng cường) thay vì học từ minh họa của chuyên gia (học bắt chước)?",
+      "vi_alt": "Robot nên tự học bằng thử và sai hay học theo người hướng dẫn?",
+      "vi_mixed": "Khi nào nên dùng reinforcement learning, khi nào dùng imitation learning?"
+    },
+    "mdp-dynamic-programming": {
+      "vi": "MDP và quy hoạch động đóng vai trò gì trong ra quyết định tuần tự và học tăng cường?",
+      "vi_alt": "Quá trình quyết định Markov và phương pháp quy hoạch động dùng để làm gì trong học tăng cường?",
+      "vi_mixed": "MDP và dynamic programming đóng vai trò gì trong reinforcement learning?"
+    },
+    "control-law-contested": {
+      "vi": "Luật điều khiển là gì, và tại sao định nghĩa vòng hở và vòng kín lại mâu thuẫn nhau?",
+      "vi_alt": "Quy luật điều khiển là gì, điều khiển hồi tiếp khác điều khiển không hồi tiếp ra sao?",
+      "vi_mixed": "Control law là gì, sao open-loop và closed-loop lại định nghĩa khác nhau?"
+    },
+    "dynamics-modeling": {
+      "vi": "Tại sao robot cần mô hình động lực học, và làm sao biến nó thành thứ dùng được cho điều khiển và mô phỏng?",
+      "vi_alt": "Vì sao cần mô hình động lực học của robot, và mô phỏng nó bằng cách nào?",
+      "vi_mixed": "Sao robot cần dynamics model, và dùng nó cho control với simulation thế nào?"
+    },
+    "pinhole-camera": {
+      "vi": "Camera lỗ kim biến cảnh 3D thành điểm ảnh như thế nào, và tại sao phải hiệu chuẩn nó?",
+      "vi_alt": "Mô hình máy ảnh lỗ kim chiếu điểm 3D lên ảnh ra sao, và vì sao cần hiệu chỉnh máy ảnh?",
+      "vi_mixed": "Pinhole camera chiếu cảnh 3D thành pixel ra sao, sao phải calibration?"
+    },
+    "stereo-depth": {
+      "vi": "Thị giác lập thể khôi phục độ sâu thế nào, và tại sao một ảnh đơn không làm được?",
+      "vi_alt": "Làm sao tính độ sâu từ hai camera, tại sao một camera không đủ?",
+      "vi_mixed": "Stereo vision tính depth thế nào, sao một ảnh không đủ?"
+    },
+    "sensor-fusion-why": {
+      "vi": "Tại sao phải hợp nhất cảm biến thay vì tin vào một cảm biến tốt nhất?",
+      "vi_alt": "Vì sao nên kết hợp nhiều cảm biến thay vì chỉ dùng cảm biến tốt nhất?",
+      "vi_mixed": "Sao phải sensor fusion thay vì tin một sensor tốt nhất?"
+    },
+    "fsm-decision": {
+      "vi": "Khi nào máy trạng thái hữu hạn là công cụ ra quyết định phù hợp, và nó thất bại ở đâu?",
+      "vi_alt": "Khi nào nên dùng ôtômát trạng thái để ra quyết định, và hạn chế của nó là gì?",
+      "vi_mixed": "Khi nào dùng finite state machine để ra quyết định, nó hỏng ở đâu?"
+    },
+    "pid-lqr-mpc": {
+      "vi": "PID, LQR và MPC khác nhau thế nào về cách tiếp cận điều khiển?",
+      "vi_alt": "Bộ điều khiển tỉ lệ – tích phân – vi phân, điều khiển tối ưu toàn phương và điều khiển dự báo khác nhau thế nào?",
+      "vi_mixed": "PID, LQR, MPC khác nhau thế nào?"
+    },
+    "ros-middleware": {
+      "vi": "Tại sao phần mềm robot được xây dựng như middleware mô-đun chạy đồng thời, và ROS nằm ở đâu trong bức tranh đó?",
+      "vi_alt": "Phần mềm trung gian cho robot là gì, và hệ điều hành robot đóng vai trò gì?",
+      "vi_mixed": "Sao phần mềm robot làm theo kiểu middleware modular chạy concurrent, ROS nằm đâu?"
+    },
+    "cnn-vit-pointnet": {
+      "vi": "CNN, vision transformer và PointNet khác nhau thế nào về cấu trúc đầu vào mà chúng khai thác?",
+      "vi_alt": "Mạng tích chập, transformer thị giác và mạng xử lý đám mây điểm khác nhau ở loại dữ liệu đầu vào nào?",
+      "vi_mixed": "CNN, vision transformer với PointNet khác nhau ở cấu trúc input thế nào?"
+    },
+    "mcl-global": {
+      "vi": "Định vị Monte Carlo giải bài toán định vị toàn cục thế nào khi robot bắt đầu trong trạng thái bị lạc?",
+      "vi_alt": "Bộ lọc hạt giúp robot tự xác định vị trí khi không biết mình đang ở đâu như thế nào?",
+      "vi_mixed": "Monte Carlo localization giải global localization ra sao khi robot bị lạc?"
+    },
+    "kinematics-models": {
+      "vi": "Mô hình động học mô tả điều gì, và mô hình xe một bánh và mô hình truyền động vi sai minh họa nó ra sao?",
+      "vi_alt": "Mô hình động học của xe hai bánh vi sai và xe kiểu unicycle mô tả chuyển động ra sao?",
+      "vi_mixed": "Kinematic model mô tả gì, unicycle model và differential drive minh họa thế nào?"
+    }
+  }
+}

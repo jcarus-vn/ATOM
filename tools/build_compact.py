@@ -12,6 +12,9 @@ stored there, not the notes/*.md re-parse) and writes:
   only when they differ from [body]).
 - ``SKILL.md``: copied verbatim when present.
 
+Names from the legacy dir's ``aliases.json`` are carried into the
+registry and the index, so a compact query matches them too.
+
 The compact directory is a query artifact: it drops the raw source
 inputs (glossary/patterns items) that live in the per-source skill
 directories. See atom_brain/compact.py for the format contract.
@@ -35,6 +38,7 @@ if __name__ == "__main__":
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from atom_brain.compact import build_bodies, build_index, compact_master  # noqa: E402
+from atom_brain.master import attach_aliases, load_aliases  # noqa: E402
 
 
 def main() -> int:
@@ -47,6 +51,7 @@ def main() -> int:
         print(f"no master.json in {args.legacy_dir}", file=sys.stderr)
         return 1
     master = json.loads(master_path.read_text(encoding="utf-8"))
+    attach_aliases(master, load_aliases(args.legacy_dir))
     compact = compact_master(master)
     bodies = {n["id"]: n.get("body", "") for n in master.get("notes", [])}
     index = build_index(compact, bodies)

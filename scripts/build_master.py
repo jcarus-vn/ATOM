@@ -15,6 +15,11 @@ Examples:
   python3 scripts/build_master.py --query --status contested
   python3 scripts/build_master.py --query --facet level=advanced --facet topic=pricing
 
+  # Let a master answer questions asked in another language: export every
+  # concept and label, add names (e.g. the Vietnamese terms), import them.
+  python3 scripts/build_master.py --field "Robotics" --export-aliases names.json
+  python3 scripts/build_master.py --field "Robotics" --import-aliases names.json
+
 Masters live under <masters-root>/<field-slug>/; the registry is
 <masters-root>/index.json. Default root: ~/.agents/skills/masters.
 Override with --masters-root or BOOK_SKILL_MASTERS_ROOT.
@@ -32,6 +37,10 @@ if __name__ == "__main__":
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from atom_brain.master import (  # noqa: E402
+    alias_template,
+    load_aliases,
+    merge_aliases,
+    save_aliases,
     validate_manifest,
     bound_view,
     build_master,
@@ -68,6 +77,53 @@ def default_root() -> Path:
     return Path.home() / ".agents" / "skills" / "masters"
 
 
+def _aliases_command(parser, args, root: Path) -> int:
+    if not args.field:
+        parser.error("--export-aliases / --import-aliases need --field")
+    master_dir = master_dir_for(root, args.field)
+    master = load_master(master_dir)
+    if not master or not master.get("notes"):
+        print(f"no master for field '{args.field}' at {master_dir}",
+              file=sys.stderr)
+        return 1
+    current = load_aliases(master_dir)
+    if args.export_aliases:
+        template = alias_template(master, current)
+        args.export_aliases.write_text(
+            json.dumps(template, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8")
+        print(f"wrote {len(template['notes'])} concepts and "
+              f"{len(template['labels'])} labels to {args.export_aliases}")
+        return 0
+    try:
+        incoming = json.loads(args.import_aliases.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"cannot read {args.import_aliases}: {exc}", file=sys.stderr)
+        return 2
+    if not isinstance(incoming, dict):
+        print(f"{args.import_aliases}: expected an object with \"notes\" "
+              "and/or \"labels\"", file=sys.stderr)
+        return 2
+    known = alias_template(master)
+    notes_in = incoming.get("notes") if isinstance(incoming.get("notes"), dict) else {}
+    labels_in = incoming.get("labels") if isinstance(incoming.get("labels"), dict) else {}
+    unknown = [k for k in notes_in if k not in known["notes"]]
+    unknown_labels = [k for k in labels_in if k not in known["labels"]]
+    for key in unknown:
+        print(f"  skipped unknown note id: {key}", file=sys.stderr)
+    for key in unknown_labels:
+        print(f"  skipped unknown label: {key}", file=sys.stderr)
+    merged, added = merge_aliases(current, {
+        "notes": {k: v for k, v in notes_in.items() if k in known["notes"]},
+        "labels": {k: v for k, v in labels_in.items() if k in known["labels"]},
+    })
+    save_aliases(master_dir, merged)
+    print(f"added {added} name(s): {len(merged['notes'])} concept(s) and "
+          f"{len(merged['labels'])} label(s) now have other names "
+          f"-> {master_dir / 'aliases.json'}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Build and query master skills.")
     parser.add_argument("--field", help="Field label for the master skill")
@@ -99,8 +155,19 @@ def main(argv=None) -> int:
     parser.add_argument("--term", help="Filter query by concept term")
     parser.add_argument("--facet", action="append", default=[],
                         help="Facet filter key=value (repeatable)")
+    parser.add_argument("--export-aliases", type=Path, metavar="FILE",
+                        help="With --field: write every note title and "
+                             "topic/area label, with the names already "
+                             "recorded, as a JSON template to fill in")
+    parser.add_argument("--import-aliases", type=Path, metavar="FILE",
+                        help="With --field: merge names from FILE (the "
+                             "--export-aliases shape) into the master's "
+                             "aliases.json; a rebuild keeps them")
     args = parser.parse_args(argv)
     root = args.masters_root or default_root()
+
+    if args.export_aliases or args.import_aliases:
+        return _aliases_command(parser, args, root)
 
     if args.list_masters:
         for entry in list_masters(root):
