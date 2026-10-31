@@ -8,7 +8,9 @@ phone home, or run a network service. The main security surface is:
 
 - the Python extraction code (parsing untrusted document files), and
 - the optional dependencies it can install on request (`pip install …` when you
-  choose `--install-missing yes`).
+  choose `--install-missing yes`), and
+- for experimental semantic retrieval only, an embedding model directory you
+  provide: its ONNX file is loaded by onnxruntime. ATOM never downloads a model.
 
 ## Supported versions
 

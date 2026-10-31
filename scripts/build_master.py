@@ -20,6 +20,11 @@ Examples:
   python3 scripts/build_master.py --field "Robotics" --export-aliases names.json
   python3 scripts/build_master.py --field "Robotics" --import-aliases names.json
 
+  # Experimental: semantic retrieval with a local embedding model
+  # (pip install "atom-brain[semantic]"; see docs/master-skill.md).
+  python3 scripts/build_master.py --field "Robotics" --embed --embed-model ~/models/e5
+  ATOM_EMBED_MODEL=~/models/e5 python3 scripts/build_master.py --question "..."
+
 Masters live under <masters-root>/<field-slug>/; the registry is
 <masters-root>/index.json. Default root: ~/.agents/skills/masters.
 Override with --masters-root or BOOK_SKILL_MASTERS_ROOT.
@@ -49,6 +54,7 @@ from atom_brain.master import (  # noqa: E402
     master_dir_for,
     parse_skill_dir,
     query_across_masters,
+    fuse_hybrid,
     rank_notes_multi,
     suggest_related,
 )
@@ -66,8 +72,95 @@ from atom_brain.compact import (  # noqa: E402
 MIN_ANSWER_SCORE = 8.0
 
 
-def _confident(ranked: list[dict], min_score: float) -> list[dict]:
-    return [hit for hit in ranked if hit["score"] >= min_score]
+def _confident(ranked: list[dict], min_score: float,
+               min_cosine: float | None = None) -> list[dict]:
+    """Hits a person can be answered from: lexical score at the threshold,
+    or (with semantic retrieval) cosine similarity at its threshold."""
+    return [hit for hit in ranked
+            if hit["score"] >= min_score
+            or (min_cosine is not None and hit.get("cosine") is not None
+                and hit["cosine"] >= min_cosine)]
+
+
+def _scores(hit: dict) -> str:
+    text = f"score {hit['score']:.2f}"
+    if hit.get("cosine") is not None:
+        text += f", cosine {hit['cosine']:.2f}"
+    return text
+
+
+_EMBEDDERS: dict = {}
+
+
+def _note(message: str) -> None:
+    print(f"  [semantic] {message}", file=sys.stderr)
+
+
+def _semantic_hits(index_dir: Path, notes, wordings: list[str], args):
+    """(semantic entries, cosine threshold) for one master or compact dir,
+    or (None, None) with the reason printed. Never raises: semantic
+    retrieval only ever adds to the lexical answer."""
+    from atom_brain import semantic
+    if not semantic.has_index(index_dir):
+        return None, None
+    model_dir = semantic.model_dir_from(args.embed_model)
+    if model_dir is None:
+        _note(f"{index_dir.name} has an embedding index but no model is set "
+              f"(--embed-model or ${semantic.MODEL_ENV}); lexical only")
+        return None, None
+    missing = semantic.missing_dependencies()
+    if missing:
+        _note(f"needs {', '.join(missing)} (pip install \"atom-brain[semantic]\"); "
+              "lexical only")
+        return None, None
+    loaded = semantic.load_index(index_dir)
+    if loaded is None:
+        _note(f"cannot read the embedding index in {index_dir}; rerun --embed")
+        return None, None
+    meta, matrix = loaded
+    try:
+        key = str(model_dir)
+        if key not in _EMBEDDERS:
+            _EMBEDDERS[key] = semantic.Embedder(model_dir)
+        embedder = _EMBEDDERS[key]
+    except semantic.SemanticUnavailable as exc:
+        _note(f"{exc}; lexical only")
+        return None, None
+    if embedder.identity != meta.get("model_id"):
+        _note("the index was built with another model; rerun --embed")
+        return None, None
+    if notes is not None:
+        stale = semantic.stale_notes(meta, notes)
+        if stale:
+            _note(f"{len(stale)} note(s) changed since the index was built; "
+                  "rerun --embed")
+    vectors = embedder.embed(wordings, kind="query")
+    return (semantic.rank_semantic(meta, matrix, vectors),
+            semantic.min_cosine_for(meta, args.min_cosine))
+
+
+def _embed_command(args, root: Path) -> int:
+    from atom_brain import semantic
+    master_dir = master_dir_for(root, args.field)
+    master = load_master(master_dir)
+    if not master or not master.get("notes"):
+        print(f"no master for field '{args.field}' at {master_dir}", file=sys.stderr)
+        return 1
+    model_dir = semantic.model_dir_from(args.embed_model)
+    if model_dir is None:
+        print(f"--embed needs a model directory: --embed-model DIR or "
+              f"${semantic.MODEL_ENV}", file=sys.stderr)
+        return 2
+    try:
+        report = semantic.build_index(master_dir, master["notes"],
+                                      semantic.Embedder(model_dir))
+    except semantic.SemanticUnavailable as exc:
+        print(f"--embed: {exc}", file=sys.stderr)
+        return 2
+    print(f"embedding index: {report['notes']} notes ({report['embedded']} "
+          f"embedded, {report['reused']} reused), {report['dim']} dimensions, "
+          f"model {report['model_id']} -> {master_dir}")
+    return 0
 
 
 def _wordings_note(also: list[str]) -> str:
@@ -166,6 +259,18 @@ def main(argv=None) -> int:
     parser.add_argument("--term", help="Filter query by concept term")
     parser.add_argument("--facet", action="append", default=[],
                         help="Facet filter key=value (repeatable)")
+    parser.add_argument("--embed", action="store_true",
+                        help="Experimental, with --field: build or update the "
+                             "master's semantic index with a local embedding "
+                             "model (after the build when sources are given)")
+    parser.add_argument("--embed-model", type=Path, default=None, metavar="DIR",
+                        help="Model directory for --embed and --question "
+                             "(model.onnx + tokenizer.json); default "
+                             "$ATOM_EMBED_MODEL")
+    parser.add_argument("--min-cosine", type=float, default=None,
+                        help="Show a semantic hit without lexical support "
+                             "only at or above this cosine (default: the "
+                             "index's min_cosine, else 0.80, uncalibrated)")
     parser.add_argument("--export-aliases", type=Path, metavar="FILE",
                         help="With --field: write every note title and "
                              "topic/area label, with the names already "
@@ -204,10 +309,14 @@ def main(argv=None) -> int:
     if args.question:
         if args.compact_dir is not None:
             registry, _index = load_compact_dir(args.compact_dir)
+            # Semantic hits outside a --source bound are dropped when they
+            # are fused: only notes the lexical pool holds take part.
+            sem, min_cos = _semantic_hits(args.compact_dir, None,
+                                          [args.question] + args.also, args)
             ranked = query_compact_dir(args.compact_dir, args.question,
                                        k=args.top, source=args.source,
-                                       also=args.also)
-            ranked = _confident(ranked[:args.top], args.min_score)
+                                       also=args.also, semantic=sem)
+            ranked = _confident(ranked[:args.top], args.min_score, min_cos)
             bound_note = f" [bound to source: {args.source}]" \
                 if args.source else ""
             print(f"[compact] top {args.top} for: {args.question}"
@@ -219,7 +328,7 @@ def main(argv=None) -> int:
             for hit in ranked:
                 note = hit["note"]
                 print(f"  - {note['title']} [{note['status']}] "
-                      f"(score {hit['score']:.2f})")
+                      f"({_scores(hit)})")
                 if args.source:
                     view = bound_view(note, args.source)
                     print(f"    {view['body']}")
@@ -242,12 +351,16 @@ def main(argv=None) -> int:
             if not master:
                 continue
             found = True
+            wordings = [args.question] + args.also
             ranked = rank_notes_multi(master.get("notes", []),
                                       master.get("taxonomy", []),
                                       master.get("graph", {}).get("edges", []),
-                                      [args.question] + args.also, k=args.top,
-                                      source=args.source)
-            ranked = _confident(ranked, args.min_score)
+                                      wordings, source=args.source)
+            sem, min_cos = _semantic_hits(Path(root) / entry.get("path", ""),
+                                          master.get("notes", []), wordings, args)
+            if sem:
+                ranked = fuse_hybrid(ranked, sem)
+            ranked = _confident(ranked[:args.top], args.min_score, min_cos)
             bound_note = f" [bound to source: {args.source}]" \
                 if args.source else ""
             print(f"[{entry['field']}] top {args.top} for: {args.question}"
@@ -259,7 +372,7 @@ def main(argv=None) -> int:
             for hit in ranked:
                 note = hit["note"]
                 print(f"  - {note['title']} [{note['status']}] "
-                      f"(score {hit['score']:.2f})")
+                      f"({_scores(hit)})")
                 if args.source:
                     view = bound_view(note, args.source)
                     print(f"    {view['body']}")
@@ -297,6 +410,8 @@ def main(argv=None) -> int:
         parser.error("--field is required (or a \"field\" in the manifest)")
     for skill_dir in args.skill_dir:
         sources.append(parse_skill_dir(Path(skill_dir)))
+    if not sources and args.embed:
+        return _embed_command(args, root)
     if not sources:
         parser.error("no sources: pass --skills-json and/or --skill-dir")
     out_dir = master_dir_for(root, args.field)
@@ -316,6 +431,11 @@ def main(argv=None) -> int:
     if summary.get("hand_edited_needing_review"):
         print("  REVIEW: hand-edited note(s) kept although their sources changed: "
               f"{', '.join(summary['hand_edited_needing_review'])}")
+    if args.embed:
+        return _embed_command(args, root)
+    from atom_brain.semantic import has_index
+    if has_index(out_dir):
+        print("  the semantic index may be stale now: rerun with --embed")
     return 0
 
 

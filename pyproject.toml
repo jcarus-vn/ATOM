@@ -20,6 +20,9 @@ pdf = ["pdf-inspector>=1.15,<2", "pypdf", "pdfminer.six"]
 docx = ["python-docx"]
 rtf = ["striprtf"]
 technical = ["docling"]
+# Experimental semantic retrieval for master skills (see docs/master-skill.md);
+# deliberately not part of "all".
+semantic = ["onnxruntime>=1.16", "tokenizers>=0.15", "numpy>=1.23"]
 all = [
     "trafilatura",
     "ebooklib",

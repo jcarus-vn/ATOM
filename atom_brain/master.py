@@ -956,6 +956,28 @@ def fuse_rankings(rankings: list[list[dict]], method: str = "sum",
     return out
 
 
+def fuse_hybrid(lexical: list[dict], semantic: list[dict]) -> list[dict]:
+    """Fuse a full lexical ranking with a semantic one by rank (RRF).
+
+    ``lexical`` holds every candidate note (rank_notes, rank_notes_multi
+    or rank_compact entries); ``semantic`` holds ``note_id`` + ``cosine``
+    entries (see atom_brain.semantic.rank_semantic). Every returned entry
+    keeps its lexical ``score`` and gains ``cosine`` (None when the note
+    is not in the semantic list) and ``fused``.
+    """
+    by_id = {_entry_id(e): e for e in lexical}
+    cosine = {e["note_id"]: e["cosine"] for e in semantic}
+    semantic_list = [by_id[e["note_id"]] for e in semantic if e["note_id"] in by_id]
+    fused = fuse_rankings([lexical, semantic_list], method="rrf")
+    seen = {_entry_id(e) for e in fused}
+    # Notes outside both lists' fusion depth keep their lexical order
+    # after the fused ones, so the ranking still covers every candidate.
+    fused += [dict(e, fused=0.0) for e in lexical if _entry_id(e) not in seen]
+    for entry in fused:
+        entry["cosine"] = cosine.get(_entry_id(entry))
+    return fused
+
+
 def rank_notes_multi(notes: list[dict], taxonomy_nodes: list[dict],
                      graph_edges: list[dict], questions: list[str],
                      k: int | None = None, source: str | None = None,

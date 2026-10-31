@@ -10,10 +10,18 @@ precision@k and MRR per set and mode.
 question, i.e. a perfect translation: an upper bound for what an agent's
 own translation brings.
 
+With ``--embed-model DIR`` (experimental; needs atom-brain[semantic]) the
+notes are embedded in memory (nothing is written to the master) and two
+more modes run: "semantic" (cosine ranking alone) and "all three" (names
++ translation, fused by rank with the semantic ranking, as the query
+command does). It also prints the cosine of each question's best gold
+note and best other note, to choose --min-cosine for that model.
+
 Usage:
   python3 tools/eval_multilingual.py <master_dir> \
       [--questions tools/eval_qa_robotics.json tools/eval_qa_robotics_holdout.json] \
-      [--translations tools/eval_qa_robotics_vi.json] [--k 5] [--json out.json]
+      [--translations tools/eval_qa_robotics_vi.json] [--k 5] [--json out.json] \
+      [--embed-model DIR]
 
 The translations file maps question id -> {set name: question text}; see
 tools/eval_qa_robotics_vi.json. "en" is always the questions' own text.
@@ -33,7 +41,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from atom_brain.master import load_master, rank_notes_multi  # noqa: E402
+from atom_brain.master import fuse_hybrid, load_master, rank_notes_multi  # noqa: E402
 from eval_answer_quality import score_question  # noqa: E402
 
 DEFAULT_QUESTIONS = [ROOT / "tools" / "eval_qa_robotics.json",
@@ -95,6 +103,56 @@ def evaluate(master: dict, questions: list[dict], sets: dict[str, dict],
     return out
 
 
+def _semantic_modes(master: dict, questions: list[dict], sets: dict, args) -> dict:
+    from atom_brain import semantic
+
+    embedder = semantic.Embedder(args.embed_model)
+    notes = master["notes"]
+    matrix = embedder.embed([semantic.note_text(n) for n in notes], kind="passage")
+    meta = {"ids": [n["id"] for n in notes]}
+    by_id = {n["id"]: n for n in notes}
+    cache: dict[tuple, list] = {}
+
+    def semantic_list(wordings):
+        key = tuple(wordings)
+        if key not in cache:
+            vectors = embedder.embed(list(wordings), kind="query")
+            cache[key] = semantic.rank_semantic(meta, matrix, vectors)
+        return cache[key]
+
+    def only_semantic(_master, wordings):
+        return [{"note": by_id[e["note_id"]], "score": e["cosine"], "cosine": e["cosine"]}
+                for e in semantic_list(wordings)]
+
+    def all_three(m, wordings):
+        return fuse_hybrid(_lexical(m, wordings), semantic_list(wordings))
+
+    out = {"semantic": evaluate(master, questions, sets, args.k, ranker=only_semantic),
+           "all three": evaluate(master, questions, sets, args.k, ranker=all_three,
+                                 translate=True)}
+    gold_best, other_best = [], []
+    for texts in sets.values():
+        for q in questions:
+            if q["id"] not in texts:
+                continue
+            ranked = semantic_list([texts[q["id"]]])
+            gold = [e["cosine"] for e in ranked if e["note_id"] in q["gold_notes"]]
+            other = [e["cosine"] for e in ranked if e["note_id"] not in q["gold_notes"]]
+            if gold:
+                gold_best.append(max(gold))
+            if other:
+                other_best.append(max(other))
+
+    def median(values):
+        values = sorted(values)
+        return values[len(values) // 2] if values else float("nan")
+
+    print(f"cosine, best gold note per question: min {min(gold_best):.3f}, median "
+          f"{median(gold_best):.3f}; best other note: median {median(other_best):.3f}, "
+          f"max {max(other_best):.3f}  (model {embedder.identity})")
+    return out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("master_dir", type=Path)
@@ -102,6 +160,7 @@ def main() -> int:
     parser.add_argument("--translations", type=Path, default=DEFAULT_TRANSLATIONS)
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--json", type=Path, default=None)
+    parser.add_argument("--embed-model", type=Path, default=None)
     args = parser.parse_args()
     master = load_master(args.master_dir)
     if not master or not master.get("notes"):
@@ -126,6 +185,8 @@ def main() -> int:
         modes["names + transl."] = (master, True)
     results = {mode: evaluate(m, questions, sets, args.k, translate=t)
                for mode, (m, t) in modes.items()}
+    if args.embed_model:
+        results.update(_semantic_modes(master, questions, sets, args))
     print(f"recall@{args.k} / precision@{args.k} / MRR, {len(questions)} questions")
     print(f"{'set':10} " + " ".join(f"{mode:>18}" for mode in results))
     for name in sets:
