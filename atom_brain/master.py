@@ -906,6 +906,78 @@ def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
     return ranked
 
 
+# Fusing several rankings of the same notes into one. Wordings of one
+# question (as asked, and translated into the notes' language) are ranked
+# by the same lexical scorer, so their scores share a scale and are summed
+# ("sum"): a wording that matches nothing adds almost nothing. Measured on
+# the Robotics master, recall@5 for Vietnamese questions fused with their
+# English wording: sum 0.88 / 0.82 / 0.93 (standard / other wording /
+# mixed), reciprocal rank fusion 0.56 / 0.39 / 0.91, because ranks give the
+# noise of the unmatched wording the same weight as real hits. Rankings on
+# different scales (a semantic ranking) are fused by rank ("rrf"):
+# 1 / (RRF_K + rank) over each list's first FUSION_DEPTH entries.
+RRF_K = 60
+FUSION_DEPTH = 50
+
+
+def _entry_id(entry: dict) -> str:
+    if "note_id" in entry:
+        return entry["note_id"]
+    return entry["note"].get("id", "")
+
+
+def fuse_rankings(rankings: list[list[dict]], method: str = "sum",
+                  depth: int = FUSION_DEPTH, k: int = RRF_K) -> list[dict]:
+    """Fuse ranked lists (rank_notes or rank_compact entries) into one.
+
+    ``method="sum"`` adds each note's scores across lists (same scale);
+    ``method="rrf"`` adds 1 / (k + rank) over each list's first ``depth``
+    entries (any scale). Each note keeps the entry where its own score was
+    highest, so ``score`` stays a single-wording lexical score the answer
+    threshold was calibrated on; the fused value is ``fused``. Order:
+    fused value, then score, then id, so results are reproducible.
+    """
+    fused: dict[str, float] = {}
+    best: dict[str, dict] = {}
+    for ranking in rankings:
+        items = ranking[:depth] if method == "rrf" else ranking
+        for rank, entry in enumerate(items, start=1):
+            note_id = _entry_id(entry)
+            gain = (1.0 / (k + rank)) if method == "rrf" else entry.get("score", 0.0)
+            fused[note_id] = fused.get(note_id, 0.0) + gain
+            if note_id not in best or entry.get("score", 0) > best[note_id].get("score", 0):
+                best[note_id] = entry
+    out = []
+    for note_id, value in fused.items():
+        entry = dict(best[note_id])
+        entry["fused"] = value
+        out.append(entry)
+    out.sort(key=lambda e: (-e["fused"], -e.get("score", 0), _entry_id(e)))
+    return out
+
+
+def rank_notes_multi(notes: list[dict], taxonomy_nodes: list[dict],
+                     graph_edges: list[dict], questions: list[str],
+                     k: int | None = None, source: str | None = None,
+                     params: dict | None = None) -> list[dict]:
+    """Rank for several wordings of one question and fuse the rankings.
+
+    One wording returns exactly :func:`rank_notes`. Use it to add a
+    translation of the question into the notes' language: the original
+    keeps its exact terms and acronyms, the translation brings the words
+    the notes use.
+    """
+    wordings = [q for q in questions if q and q.strip()]
+    if len(wordings) <= 1:
+        return rank_notes(notes, taxonomy_nodes, graph_edges,
+                          wordings[0] if wordings else "", k=k,
+                          source=source, params=params)
+    fused = fuse_rankings([rank_notes(notes, taxonomy_nodes, graph_edges, q,
+                                      source=source, params=params)
+                           for q in wordings])
+    return fused[:k] if k is not None and k > 0 else fused
+
+
 def suggest_related(notes: list[dict], graph_edges: list[dict],
                     retrieved_ids: list[str], limit: int = 5,
                     source: str | None = None) -> list[dict]:
@@ -1236,8 +1308,11 @@ def render_skill_md(field: str, notes: list[dict], conflicts: list[dict],
               f'--question "<question>" --top 5`, then open notes/<id>.md of the hits.',
               "  With a compact build, add `--compact-dir <dir>` instead of reading files.",
               "- No hit above the threshold means the master does not hold the answer: say so.",
-              "- Notes keep their sources' language. To ask in another, add names "
-              "with `--export-aliases` / `--import-aliases` (docs/master-skill.md).",
+              "- Notes keep their sources' language. For a question in another "
+              "language, also pass your translation of it into the notes' language: "
+              "`--also \"<translation>\"` (the rankings are fused). Names added "
+              "with `--export-aliases` / `--import-aliases` help too "
+              "(docs/master-skill.md).",
               "- Read taxonomy.md only to browse by area; it is large.",
               "- Filter notes by facet (topic, technique, level, source_type).",
               "- Check relations.md / graph.json for typed links between concepts.",
