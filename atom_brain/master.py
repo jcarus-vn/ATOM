@@ -698,6 +698,64 @@ def _rank_terms(text: str) -> list[str]:
             and (len(t) >= 2 or not t.isascii())]
 
 
+_ACRONYM_RE = re.compile(r"[^\W_]*(?:[A-Z][^\W_]*[A-Z]|\d)[^\W_]*")
+
+
+def _alias_units(text: str, query: bool = False) -> set[str]:
+    """Match units for an alias, or (``query=True``) for a question.
+
+    Names are matched on pairs of adjacent words, not single words:
+    Vietnamese writes one syllable per word, so "vi sai" (differential)
+    must not match "sai số" (error), and "lập kế hoạch" must not match
+    every "kế". Pairs made only of function words are dropped. A single
+    word counts on its own only when it is an acronym in the alias
+    (EKF, SLAM, RGB-D, 3D) or the whole alias is one word; a question
+    offers all its words as singles, so "ekf" typed in lowercase matches.
+    """
+    raw = _raw_terms(text)
+    units: set[str] = set()
+    for first, second in zip(raw, raw[1:]):
+        if first in _RANK_STOPWORDS and second in _RANK_STOPWORDS:
+            continue
+        units.add(f"{first} {second}")
+    if query:
+        units.update(_rank_terms(text))
+    elif len(raw) == 1:
+        units.update(_rank_terms(text))
+    else:
+        for word in _ACRONYM_RE.findall(text or ""):
+            units.update(_rank_terms(word))
+    return units
+
+
+def _title_match(qterms: set, qunits: set, title_terms: set,
+                 alias_units: list[set]) -> tuple[int, float]:
+    """(hits, coverage) of the best of a note's title and its aliases.
+
+    The title counts word hits as before; each alias counts unit hits
+    (see :func:`_alias_units`). The best is the one scoring highest as
+    3 * hits + coverage, the same weights the ranker gives a title.
+    """
+    hits = len(qterms & title_terms)
+    best = (hits, hits / len(title_terms) if title_terms else 0.0)
+    for units in alias_units:
+        if not units:
+            continue
+        alias_hits = len(qunits & units)
+        candidate = (alias_hits, alias_hits / len(units))
+        if 3 * candidate[0] + candidate[1] > 3 * best[0] + best[1]:
+            best = candidate
+    return best
+
+
+def _alias_in_question(aliases: list[str], qnorm: str) -> bool:
+    for alias in aliases:
+        norm = normalize_title(alias)
+        if len(norm) > 2 and norm in qnorm:
+            return True
+    return False
+
+
 def _chapter_keys(note: dict) -> set[str]:
     """Base URLs of a note's source citations (one key per chapter)."""
     keys = set()
@@ -769,11 +827,14 @@ def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
             if key in params:
                 cfg[key] = params[key]
     qterms = set(_rank_terms(question))
+    qunits = _alias_units(question, query=True)
     qnorm = normalize_title(question)
     qraw = set(_raw_terms(question))
     node_labels: dict[str, set[str]] = {}
     for node in taxonomy_nodes or []:
         label_terms = set(_rank_terms(node.get("label", "")))
+        for alias in node.get("aliases", []):
+            label_terms.update(_rank_terms(alias))
         for url in node.get("sources", []):
             for found in re.findall(r"https?://\S+", url):
                 node_labels.setdefault(found, set()).update(label_terms)
@@ -782,8 +843,9 @@ def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
     for note in notes:
         title_terms = set(_rank_terms(note.get("title", "")))
         body_terms = set(_rank_terms(note.get("body", "")))
-        title_hits = len(qterms & title_terms)
-        coverage = title_hits / len(title_terms) if title_terms else 0.0
+        aliases = note.get("aliases", [])
+        title_hits, coverage = _title_match(
+            qterms, qunits, title_terms, [_alias_units(a) for a in aliases])
         tax_terms: set[str] = set()
         for citation in note.get("sources", []):
             for url in re.findall(r"https?://\S+", citation):
@@ -791,6 +853,8 @@ def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
         tax_hits = len(qterms & tax_terms)
         body_hits = len(qterms & body_terms)
         topic_terms = set(_rank_terms((note.get("facets") or {}).get("topic", "")))
+        for alias in note.get("topic_aliases", []):
+            topic_terms.update(_rank_terms(alias))
         topic_hits = len(qterms & topic_terms)
         title_norm = normalize_title(note.get("title", ""))
         concept = 0.0
@@ -799,6 +863,8 @@ def rank_notes(notes: list[dict], taxonomy_nodes: list[dict],
         else:
             match = re.search(r"\(([^)]+)\)", note.get("title", ""))
             if match and normalize_title(match.group(1)) in qnorm:
+                concept = 1.0
+            elif _alias_in_question(aliases, qnorm):
                 concept = 1.0
         glossary = 1.0 if (definitional
                             and note.get("kind") == "glossary") else 0.0
@@ -1170,6 +1236,8 @@ def render_skill_md(field: str, notes: list[dict], conflicts: list[dict],
               f'--question "<question>" --top 5`, then open notes/<id>.md of the hits.',
               "  With a compact build, add `--compact-dir <dir>` instead of reading files.",
               "- No hit above the threshold means the master does not hold the answer: say so.",
+              "- Notes keep their sources' language. To ask in another, add names "
+              "with `--export-aliases` / `--import-aliases` (docs/master-skill.md).",
               "- Read taxonomy.md only to browse by area; it is large.",
               "- Filter notes by facet (topic, technique, level, source_type).",
               "- Check relations.md / graph.json for typed links between concepts.",
@@ -1199,6 +1267,141 @@ def master_dir_for(masters_root: Path, field: str) -> Path:
     return Path(masters_root) / slugify(field)
 
 
+# ---------------------------------------------------------------------------
+# Aliases: other names for a concept or an area, e.g. in another language,
+# so a question asked in that language finds notes written in English.
+# They live in <master>/aliases.json, which the builder never writes: a
+# rebuild or fold-in keeps them (the old directory is copied before the
+# swap). Shape: {"notes": {note_id: [name, ...]},
+#                "labels": {topic or taxonomy label: [name, ...]}}.
+# ---------------------------------------------------------------------------
+
+ALIASES_FILE = "aliases.json"
+_RUNTIME_ALIAS_KEYS = ("aliases", "topic_aliases")
+
+
+def _clean_names(names) -> list[str]:
+    """Strings only, trimmed, duplicates (by normalized form) dropped."""
+    out: list[str] = []
+    seen: set[str] = set()
+    if isinstance(names, dict):
+        names = names.get("aliases", [])
+    if isinstance(names, str):
+        names = [names]
+    for name in names or []:
+        if not isinstance(name, str):
+            continue
+        name = " ".join(name.split())
+        key = normalize_title(name)
+        if name and key and key not in seen:
+            seen.add(key)
+            out.append(name)
+    return out
+
+
+def load_aliases(master_dir: Path) -> dict:
+    """The master's aliases, or empty maps when there is no valid file."""
+    path = Path(master_dir) / ALIASES_FILE
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    notes = data.get("notes") if isinstance(data.get("notes"), dict) else {}
+    labels = data.get("labels") if isinstance(data.get("labels"), dict) else {}
+    return {"notes": {str(k): _clean_names(v) for k, v in notes.items()
+                      if _clean_names(v)},
+            "labels": {str(k): _clean_names(v) for k, v in labels.items()
+                       if _clean_names(v)}}
+
+
+def merge_aliases(current: dict, incoming: dict) -> tuple[dict, int]:
+    """Union of two alias maps; returns (merged, number of names added)."""
+    merged = {"notes": {k: list(v) for k, v in current.get("notes", {}).items()},
+              "labels": {k: list(v) for k, v in current.get("labels", {}).items()}}
+    added = 0
+    for section in ("notes", "labels"):
+        for key, names in (incoming.get(section) or {}).items():
+            have = merged[section].setdefault(str(key), [])
+            before = len(have)
+            merged[section][str(key)] = _clean_names(have + _clean_names(names))
+            added += len(merged[section][str(key)]) - before
+            if not merged[section][str(key)]:
+                del merged[section][str(key)]
+    return merged, added
+
+
+def save_aliases(master_dir: Path, aliases: dict) -> None:
+    data = {"notes": dict(sorted(aliases.get("notes", {}).items())),
+            "labels": dict(sorted(aliases.get("labels", {}).items()))}
+    _write_atomically(Path(master_dir) / ALIASES_FILE,
+                      json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+def attach_aliases(master: dict, aliases: dict) -> dict:
+    """Put aliases on the loaded notes and taxonomy nodes the ranker reads:
+    ``note["aliases"]``, ``note["topic_aliases"]`` (names of the note's
+    topic) and ``node["aliases"]``. Keys are only set when non-empty, so a
+    master without aliases is unchanged. Never written back to notes/."""
+    by_note = aliases.get("notes", {})
+    by_label = aliases.get("labels", {})
+    for note in master.get("notes", []) or []:
+        for key in _RUNTIME_ALIAS_KEYS:
+            note.pop(key, None)
+        names = by_note.get(note.get("id", ""), [])
+        if names:
+            note["aliases"] = list(names)
+        topic = (note.get("facets") or {}).get("topic", "")
+        if topic and by_label.get(topic):
+            note["topic_aliases"] = list(by_label[topic])
+    for node in master.get("taxonomy", []) or []:
+        node.pop("aliases", None)
+        names = _clean_names(by_note.get(node.get("id", ""), [])
+                             + by_label.get(node.get("label", ""), []))
+        if names:
+            node["aliases"] = names
+    return master
+
+
+def alias_template(master: dict, aliases: dict | None = None) -> dict:
+    """What to translate: every note title and every topic / taxonomy
+    label, with the names already recorded. Fill the lists and import."""
+    aliases = aliases or {"notes": {}, "labels": {}}
+    labels = set()
+    for note in master.get("notes", []):
+        topic = (note.get("facets") or {}).get("topic", "")
+        if topic:
+            labels.add(topic)
+    for node in master.get("taxonomy", []):
+        if str(node.get("id", "")).startswith("area-") and node.get("label"):
+            labels.add(node["label"])
+    return {
+        "field": master.get("field", ""),
+        "instructions": (
+            "Add other names for each concept and label, e.g. the usual "
+            "Vietnamese term, as lists of strings. Keep acronyms. Leave a "
+            "list empty when unsure. Import with build_master.py "
+            "--import-aliases."),
+        "notes": {n["id"]: {"title": n.get("title", ""),
+                            "aliases": list(aliases["notes"].get(n["id"], []))}
+                  for n in sorted(master.get("notes", []),
+                                  key=lambda n: n.get("id", ""))},
+        "labels": {label: list(aliases["labels"].get(label, []))
+                   for label in sorted(labels)},
+    }
+
+
+def _strip_runtime_aliases(notes: list[dict], nodes: list[dict]) -> None:
+    for note in notes:
+        for key in _RUNTIME_ALIAS_KEYS:
+            note.pop(key, None)
+    for node in nodes:
+        node.pop("aliases", None)
+
+
 def load_master(master_dir: Path) -> dict | None:
     """Load an existing master. notes/*.md files are authoritative when
     present (hand edits survive); master.json is the fallback index.
@@ -1206,7 +1409,8 @@ def load_master(master_dir: Path) -> dict | None:
     The notes the last build itself wrote (from master.json) are kept
     under ``_built_notes`` so a fold-in can tell a hand edit or a
     hand-added note apart from builder output; that key is never written
-    back to disk.
+    back to disk. Names from aliases.json are attached for the ranker (see
+    :func:`attach_aliases`); they are never written into notes/ either.
     """
     master_dir = Path(master_dir)
     notes_dir = master_dir / "notes"
@@ -1231,7 +1435,8 @@ def load_master(master_dir: Path) -> dict | None:
                  "body": n.get("body", "")}
                 for n in (manifest.get("notes") or [])]
         manifest["notes"] = notes
-        return manifest
+    if isinstance(manifest, dict):
+        attach_aliases(manifest, load_aliases(master_dir))
     return manifest
 
 
@@ -1413,6 +1618,10 @@ def build_master(field: str, sources: list[dict], masters_root: Path,
         "unresolved_relations": merged["unresolved_relations"],
         "cross_field_links": cross_links,
     }
+    # Aliases stay in aliases.json, which this build does not touch; a
+    # hand-added note carried over from the loaded master must not copy
+    # them into master.json.
+    _strip_runtime_aliases(notes, taxonomy_nodes)
     notes_by_id = {n["id"]: n for n in notes}
     files = {
         "glossary.md": render_glossary_md(notes),

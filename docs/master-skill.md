@@ -117,6 +117,45 @@ note bodies survive fold-in because existing `notes/*.md` files are
 parsed back first; the machine-readable `master.json` is regenerated
 from the same build so the two never drift within one build.
 
+## Asking in another language
+
+Notes keep the language of their sources, and the ranker matches words,
+so a question in another language finds little: on the Robotics master,
+22 gold questions translated to Vietnamese reach recall@5 0.44 against
+0.88 in English. Give concepts their names in that language:
+
+```bash
+python3 scripts/build_master.py --field "Robotics" --export-aliases names.json
+# fill each "aliases" list (an agent can translate the titles), then:
+python3 scripts/build_master.py --field "Robotics" --import-aliases names.json
+```
+
+Names are stored in `<master>/aliases.json` (`notes`: note id to names,
+`labels`: topic or taxonomy label to names). The builder never writes
+that file, so rebuilds and fold-ins keep it; importing again adds to it.
+A compact build carries the names into its registry and index. This is
+separate from a manifest source's `aliases`, which only merges spellings
+of one concept at build time.
+
+How names are matched: a concept name counts like a second title, on
+pairs of adjacent words (so "vi sai", differential, does not match
+"sai số", error) plus ASCII words such as acronyms; a topic or area
+name counts like its label. Measured with `tools/eval_multilingual.py`
+on the Robotics master, 22 questions per set, recall@5:
+
+| Questions | Without names | With names |
+| --- | ---: | ---: |
+| English | 0.88 | 0.88 |
+| Vietnamese, standard terms | 0.44 | 0.86 |
+| Vietnamese, other wording | 0.20 | 0.73 |
+| Vietnamese with English terms mixed in | 0.91 | 0.89 |
+
+The Vietnamese questions and the names were written by the same
+translator (an AI), so the second row is optimistic; the "other wording"
+set, written to avoid the names' terms, is closer to a real reader. A
+question that describes a concept without naming it ("learning by trial
+and error") still finds nothing: names fix terminology, not paraphrase.
+
 ## Taxonomy lookup, measured
 
 `tools/eval_taxonomy_lookup.py <master-dir>` compares looking a
