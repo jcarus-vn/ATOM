@@ -2,8 +2,13 @@
 """Measure retrieval for questions asked in another language than the notes.
 
 Runs the gold questions in English and in each translated set against one
-master, with and without the master's other names (aliases.json), and
-prints recall@k, precision@k and MRR per set and mode.
+master, with and without the master's other names (aliases.json), and with
+and without a translation fused in (``--also``), and prints recall@k,
+precision@k and MRR per set and mode.
+
+"+ translation" fuses each translated question with the English gold
+question, i.e. a perfect translation: an upper bound for what an agent's
+own translation brings.
 
 Usage:
   python3 tools/eval_multilingual.py <master_dir> \
@@ -28,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from atom_brain.master import load_master, rank_notes  # noqa: E402
+from atom_brain.master import load_master, rank_notes_multi  # noqa: E402
 from eval_answer_quality import score_question  # noqa: E402
 
 DEFAULT_QUESTIONS = [ROOT / "tools" / "eval_qa_robotics.json",
@@ -52,12 +57,20 @@ def question_sets(questions: list[dict], translations: dict) -> dict[str, dict]:
     return sets
 
 
+def _lexical(master: dict, wordings: list[str]) -> list[dict]:
+    return rank_notes_multi(master.get("notes", []), master.get("taxonomy", []),
+                            master.get("graph", {}).get("edges", []), wordings)
+
+
 def evaluate(master: dict, questions: list[dict], sets: dict[str, dict],
-             k: int, ranker=None) -> dict:
-    """{set: {"recall", "precision", "mrr", "n", "per_question"}}."""
-    ranker = ranker or (lambda m, text: rank_notes(
-        m.get("notes", []), m.get("taxonomy", []),
-        m.get("graph", {}).get("edges", []), text))
+             k: int, ranker=None, translate: bool = False) -> dict:
+    """{set: {"recall", "precision", "mrr", "n", "per_question"}}.
+
+    ``ranker(master, wordings)`` ranks a list of wordings of one question;
+    with ``translate`` the English gold question is added to every
+    non-English wording."""
+    ranker = ranker or _lexical
+    english = {q["id"]: q["question"] for q in questions}
     out: dict[str, dict] = {}
     for name, texts in sets.items():
         scores = []
@@ -65,7 +78,10 @@ def evaluate(master: dict, questions: list[dict], sets: dict[str, dict],
             if q["id"] not in texts:
                 continue
             item = dict(q, question=texts[q["id"]])
-            scores.append(score_question(item, ranker(master, texts[q["id"]]), k))
+            wordings = [texts[q["id"]]]
+            if translate and name != "en":
+                wordings.append(english[q["id"]])
+            scores.append(score_question(item, ranker(master, wordings), k))
         if not scores:
             continue
         n = len(scores)
@@ -98,13 +114,18 @@ def main() -> int:
     sets = question_sets(questions, data.get("questions", data))
     has_names = any(n.get("aliases") or n.get("topic_aliases")
                     for n in master["notes"])
-    modes = {"no names": _without_names(master)}
+    plain = _without_names(master)
+    modes = {"no names": (plain, False)}
     if has_names:
-        modes["names"] = master
+        modes["names"] = (master, False)
     else:
-        print("note: this master has no aliases.json; only 'no names' is measured",
+        print("note: this master has no aliases.json; 'names' is not measured",
               file=sys.stderr)
-    results = {mode: evaluate(m, questions, sets, args.k) for mode, m in modes.items()}
+    modes["+ translation"] = (plain, True)
+    if has_names:
+        modes["names + transl."] = (master, True)
+    results = {mode: evaluate(m, questions, sets, args.k, translate=t)
+               for mode, (m, t) in modes.items()}
     print(f"recall@{args.k} / precision@{args.k} / MRR, {len(questions)} questions")
     print(f"{'set':10} " + " ".join(f"{mode:>18}" for mode in results))
     for name in sets:

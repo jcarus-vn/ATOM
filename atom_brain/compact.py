@@ -62,6 +62,7 @@ from atom_brain.master import (
     _rank_terms,
     _raw_terms,
     _title_match,
+    fuse_rankings,
     normalize_title,
 )
 
@@ -769,14 +770,17 @@ def fetch_bodies(compact_dir: Path, note_ids: list[str]) -> dict[str, str]:
 
 def query_compact_dir(compact_dir: Path, question: str,
                       k: int | None = None, source: str | None = None,
-                      params: dict | None = None) -> list[dict]:
+                      params: dict | None = None,
+                      also: list[str] | None = None) -> list[dict]:
     """Two-phase query over a compact directory.
 
     Phase 1 ranks from registry + index (no bodies). Phase 2 fetches
     bodies for the top-k only and returns rank_notes-shaped entries:
     full legacy note dicts for the top-k, id-only dicts beyond it (the
     eval only reads bodies of the top-k; ids carry the full ranking
-    for MRR).
+    for MRR). ``also`` adds other wordings of the question (e.g. a
+    translation into the notes' language); their rankings are fused with
+    :func:`atom_brain.master.fuse_rankings`.
     """
     compact_dir = Path(compact_dir)
     registry, index = load_compact_dir(compact_dir)
@@ -785,8 +789,10 @@ def query_compact_dir(compact_dir: Path, question: str,
         cite_texts = {}
         for entry in registry["notes"]:
             cite_texts[entry["id"]] = _decode_srcs(entry["src"], registry["cites"])
-    ranked = rank_compact(index, question, k=None, source=source,
-                          params=params, cite_texts=cite_texts)
+    wordings = [question] + [q for q in (also or []) if q and q.strip()]
+    rankings = [rank_compact(index, q, k=None, source=source, params=params,
+                             cite_texts=cite_texts) for q in wordings]
+    ranked = rankings[0] if len(rankings) == 1 else fuse_rankings(rankings)
     top = ranked[:k] if k is not None and k > 0 else ranked
     bodies = fetch_bodies(compact_dir, [entry["note_id"] for entry in top])
     by_id = {entry["id"]: entry for entry in registry["notes"]}
@@ -797,7 +803,9 @@ def query_compact_dir(compact_dir: Path, question: str,
             note = expand_note_with_body(registry, by_id[note_id], bodies[note_id])
         else:
             note = {"id": note_id}
+        extra = {"fused": entry["fused"]} if "fused" in entry else {}
         entries.append({
+            **extra,
             "note": note,
             "score": entry["score"],
             "title_hits": entry["title_hits"],

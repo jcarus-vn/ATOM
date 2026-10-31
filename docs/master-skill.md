@@ -156,6 +156,29 @@ set, written to avoid the names' terms, is closer to a real reader. A
 question that describes a concept without naming it ("learning by trial
 and error") still finds nothing: names fix terminology, not paraphrase.
 
+An agent can also translate the question itself and pass both wordings:
+
+```bash
+python3 scripts/build_master.py --question "Lập kế hoạch chuyển động là gì?" \
+    --also "What is motion planning?"
+```
+
+Each wording is ranked and the scores are summed per note, so a wording
+that matches nothing changes little; the answer threshold still applies
+to each note's best single-wording score. Same master and questions,
+recall@5, with the English gold question standing in for the agent's
+translation (a perfect translation, so an upper bound):
+
+| Questions | Names | Translation | Names + translation |
+| --- | ---: | ---: | ---: |
+| Vietnamese, standard terms | 0.86 | 0.88 | 0.90 |
+| Vietnamese, other wording | 0.73 | 0.82 | 0.85 |
+| Vietnamese with English terms mixed in | 0.89 | 0.92 | 0.90 |
+
+Summing scores beat reciprocal rank fusion here (0.56 / 0.39 / 0.91
+for the translation column), because ranks give an unmatched wording's
+noise the same weight as real hits.
+
 ## Taxonomy lookup, measured
 
 `tools/eval_taxonomy_lookup.py <master-dir>` compares looking a

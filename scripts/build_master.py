@@ -49,7 +49,7 @@ from atom_brain.master import (  # noqa: E402
     master_dir_for,
     parse_skill_dir,
     query_across_masters,
-    rank_notes,
+    rank_notes_multi,
     suggest_related,
 )
 from atom_brain.compact import (  # noqa: E402
@@ -68,6 +68,13 @@ MIN_ANSWER_SCORE = 8.0
 
 def _confident(ranked: list[dict], min_score: float) -> list[dict]:
     return [hit for hit in ranked if hit["score"] >= min_score]
+
+
+def _wordings_note(also: list[str]) -> str:
+    wordings = [a for a in also if a and a.strip()]
+    if not wordings:
+        return ""
+    return f" (+ {len(wordings)} other wording(s): {'; '.join(wordings)})"
 
 
 def default_root() -> Path:
@@ -136,6 +143,10 @@ def main(argv=None) -> int:
     parser.add_argument("--question",
                         help="Natural-language question: rank notes with "
                              "the shared ranker and show related keywords")
+    parser.add_argument("--also", action="append", default=[], metavar="TEXT",
+                        help="Another wording of --question, e.g. its "
+                             "translation into the notes' language "
+                             "(repeatable); the rankings are fused")
     parser.add_argument("--source",
                         help="Bound results to one source: case-insensitive "
                              "substring over source citations; composes "
@@ -194,11 +205,13 @@ def main(argv=None) -> int:
         if args.compact_dir is not None:
             registry, _index = load_compact_dir(args.compact_dir)
             ranked = query_compact_dir(args.compact_dir, args.question,
-                                       k=args.top, source=args.source)
+                                       k=args.top, source=args.source,
+                                       also=args.also)
             ranked = _confident(ranked[:args.top], args.min_score)
             bound_note = f" [bound to source: {args.source}]" \
                 if args.source else ""
-            print(f"[compact] top {args.top} for: {args.question}{bound_note}")
+            print(f"[compact] top {args.top} for: {args.question}"
+                  f"{_wordings_note(args.also)}{bound_note}")
             if not ranked:
                 print(f"  No note scores {args.min_score} or more: this master "
                       "does not hold an answer to that question.")
@@ -229,16 +242,16 @@ def main(argv=None) -> int:
             if not master:
                 continue
             found = True
-            ranked = rank_notes(master.get("notes", []),
-                                master.get("taxonomy", []),
-                                master.get("graph", {}).get("edges", []),
-                                args.question, k=args.top,
-                                source=args.source)
+            ranked = rank_notes_multi(master.get("notes", []),
+                                      master.get("taxonomy", []),
+                                      master.get("graph", {}).get("edges", []),
+                                      [args.question] + args.also, k=args.top,
+                                      source=args.source)
             ranked = _confident(ranked, args.min_score)
             bound_note = f" [bound to source: {args.source}]" \
                 if args.source else ""
             print(f"[{entry['field']}] top {args.top} for: {args.question}"
-                  f"{bound_note}")
+                  f"{_wordings_note(args.also)}{bound_note}")
             if not ranked:
                 print(f"  No note scores {args.min_score} or more: this master "
                       "does not hold an answer to that question.")
