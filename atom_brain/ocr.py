@@ -49,6 +49,7 @@ blocks are not real columns (``ocr_page_bytes``); figures keep PSM 6.
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import shlex
 import shutil
@@ -331,11 +332,69 @@ def _page_confidence(tsv: str) -> tuple[float, int]:
     return sum(confidences) / len(confidences), len(confidences)
 
 
+# A tilted page is read far worse by tesseract, which looks for horizontal
+# text lines -- and a mild tilt can be read "confidently wrong" (measured
+# with tools/eval_ocr.py: a 7-10 degree tilt one way reads at mean
+# confidence 64-87 yet 32-91% wrong), so it cannot be caught by confidence
+# alone. The tilt is therefore estimated on every page that has ink, and a
+# page tilted past DESKEW_TRIGGER is straightened and read again. The
+# estimate rotates a small binarized copy through candidate angles and
+# takes the one whose row-ink profile varies most -- level text lines make
+# dark rows and white gaps alternate sharply. It is ~5% of one OCR pass
+# (measured ~76 ms vs ~2.1 s). It needs Pillow, which the render step
+# already uses; without Pillow the estimate returns 0 and OCR is unchanged.
+# Below DESKEW_TRIGGER tesseract reads a page correctly, so it is left be.
+DESKEW_TRIGGER = 5.0
+DESKEW_MAX_ANGLE = 15
+DESKEW_STEP = 1.0
+DESKEW_HEIGHT = 300
+
+
+def _deskew_angle(data: bytes) -> float:
+    """Estimated tilt of a page in degrees (0.0 when none, or no Pillow)."""
+    try:
+        from PIL import Image
+        image = Image.open(io.BytesIO(data)).convert("L")
+        if image.height > DESKEW_HEIGHT:
+            width = max(1, image.width * DESKEW_HEIGHT // image.height)
+            image = image.resize((width, DESKEW_HEIGHT))
+        ink = image.point(lambda p: 255 if p < 128 else 0)
+        width, height = ink.size
+        steps = int(DESKEW_MAX_ANGLE / DESKEW_STEP)
+        best_angle, best_score = 0.0, -1.0
+        for i in range(-steps, steps + 1):
+            angle = i * DESKEW_STEP
+            rotated = ink.rotate(angle, fillcolor=0) if angle else ink
+            pixels = rotated.tobytes()
+            rows = [0] * height
+            for index, value in enumerate(pixels):
+                if value:
+                    rows[index // width] += 1
+            score = sum((rows[r + 1] - rows[r]) ** 2 for r in range(height - 1))
+            if score > best_score:
+                best_score, best_angle = score, angle
+        return best_angle
+    except Exception:
+        return 0.0
+
+
+def _deskewed_png(data: bytes, angle: float) -> bytes | None:
+    try:
+        from PIL import Image
+        image = Image.open(io.BytesIO(data)).convert("L").rotate(
+            angle, expand=True, fillcolor=255)
+        out = io.BytesIO()
+        image.save(out, "PNG")
+        return out.getvalue()
+    except Exception:
+        return None
+
+
 def _recover_low_confidence(data: bytes, lang: str, timeout: int):
-    """Extra reads of a page the first pass read poorly, each as
-    (text, mean confidence). PSM 1 adds tesseract's orientation detection,
-    which turns an upside-down page upright. Later changes add more
-    strategies (deskew, an external OCR hook)."""
+    """Extra reads of a page the first pass read with low confidence, each
+    as (text, mean confidence). PSM 1 adds tesseract's orientation
+    detection, which turns an upside-down page upright. A later change adds
+    an external OCR hook."""
     attempts = []
     osd = _ocr_with_layout(data, lang, timeout, OSD_PAGE_PSM)
     if osd is not None:
@@ -343,17 +402,35 @@ def _recover_low_confidence(data: bytes, lang: str, timeout: int):
     return attempts
 
 
+def _deskew_candidate(data: bytes, lang: str, timeout: int):
+    """A read of the page straightened, as (text, confidence), when it is
+    tilted past DESKEW_TRIGGER; else None. Separate from the confidence
+    recovery because a mild tilt can read confidently yet wrong."""
+    angle = _deskew_angle(data)
+    if abs(angle) < DESKEW_TRIGGER:
+        return None
+    straight = _deskewed_png(data, angle)
+    if straight is None:
+        return None
+    read = _ocr_with_layout(straight, lang, timeout, OSD_PAGE_PSM)
+    if read is None:
+        return None
+    return read[0], _page_confidence(read[1])[0]
+
+
 def ocr_page_bytes(data: bytes, lang: str | None = None,
                    timeout: int = DEFAULT_TIMEOUT, psm: int | None = None) -> str | None:
-    """OCR one rendered page so that two-column pages, tables and
+    """OCR one rendered page so that two-column pages, tables, tilted and
     misoriented pages all come out readable.
 
     *psm* None (the default) reads with PSM 3, reads again with PSM 6 when
     PSM 3 split the page into side-by-side blocks that are not real
-    columns, and -- when the read is low-confidence and the page has ink --
-    retries to recover a misoriented page, keeping the best read. Each
-    extra tesseract run happens only on a page that needs it. An explicit
-    *psm* is used as is, with no recovery.
+    columns, and on a page that has ink: retries with orientation detection
+    when the first read is low-confidence (an upside-down page), and reads a
+    straightened copy when the page is tilted (a tilt reads confidently yet
+    wrong, so this does not wait for low confidence). The highest-confidence
+    read wins, and each extra tesseract run happens only when its trigger
+    fires. An explicit *psm* is used as is, with no recovery.
     """
     if psm is not None:
         return ocr_image_bytes(data, lang=lang, timeout=timeout, psm=psm)
@@ -369,14 +446,19 @@ def ocr_page_bytes(data: bytes, lang: str | None = None,
         if rows:
             return rows
     confidence, _words = _page_confidence(tsv)
-    if confidence < MIN_PAGE_CONFIDENCE and not is_blank_image(data):
-        best_text, best_confidence = text, confidence
-        for cand_text, cand_confidence in _recover_low_confidence(
-                data, resolved, timeout):
-            if cand_confidence > best_confidence:
-                best_text, best_confidence = cand_text, cand_confidence
-        text = best_text
-    return text.strip() or None
+    if is_blank_image(data):
+        return text.strip() or None
+    best_text, best_confidence = text, confidence
+    candidates = []
+    if confidence < MIN_PAGE_CONFIDENCE:
+        candidates += _recover_low_confidence(data, resolved, timeout)
+    deskewed = _deskew_candidate(data, resolved, timeout)
+    if deskewed is not None:
+        candidates.append(deskewed)
+    for cand_text, cand_confidence in candidates:
+        if cand_confidence > best_confidence:
+            best_text, best_confidence = cand_text, cand_confidence
+    return best_text.strip() or None
 
 
 def ocr_image_file(path: str, lang: str | None = None,
@@ -643,7 +725,7 @@ def clear_cache(cache_dir: str | None = None) -> tuple[int, int]:
 # Bump when the text produced for the same page render changes, so a cache
 # filled by an older version is not served. 2: pages read with PSM 3 (two
 # columns in order), PSM 6 for tables.
-PAGE_TEXT_VERSION = "3"
+PAGE_TEXT_VERSION = "4"
 
 
 def _cache_key(png: bytes, lang: str, psm: int | None) -> str:

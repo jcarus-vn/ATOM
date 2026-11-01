@@ -214,7 +214,7 @@ def _degrade(img, skew=0.0, blur=0.0, noise=0.0, seed=0):
     from PIL import ImageFilter
     out = img
     if skew:
-        out = out.rotate(skew, resample=3, expand=False, fillcolor=255)
+        out = out.rotate(skew, resample=3, expand=True, fillcolor=255)
     if blur:
         out = out.filter(ImageFilter.GaussianBlur(blur))
     if noise:
@@ -241,6 +241,7 @@ PAGES = {
     "one-column-upside-down": dict(columns=1, lines_per_col=40, _rotate=180),
     "two-column-upside-down": dict(columns=2, _rotate=180),
     "one-column-skew-2":    dict(columns=1, lines_per_col=40, _skew=2.0),
+    "one-column-skew-10":   dict(columns=1, lines_per_col=40, _skew=10.0),
     "two-column-skew-1":    dict(columns=2, _skew=1.0),
     "one-column-noisy":     dict(columns=1, lines_per_col=40, _blur=1.2, _noise=0.004),
     "two-column-noisy":     dict(columns=2, _blur=1.2, _noise=0.004),
