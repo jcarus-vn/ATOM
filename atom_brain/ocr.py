@@ -225,6 +225,17 @@ TABLE_PSM = 6
 COLUMN_MIN_WIDTH = 0.25      # of the page's text width
 COLUMN_MIN_GUTTER = 1.0      # in median word heights
 
+# When the first read of a page comes back below this mean word confidence
+# the page may be upside down or otherwise misread, so it is read again
+# with PSM 1 (tesseract's own orientation detection) and the higher-
+# confidence read is kept. Measured with tools/eval_ocr.py: an upright
+# page scores ~96, a page turned 180 degrees ~39, and a blank or badly
+# skewed page yields no words at all (reported as -1). The threshold sits
+# well below a clean read and above the misread, and the recovery pass
+# only runs on a page that has ink, so a normal book pays nothing for it.
+OSD_PAGE_PSM = 1
+MIN_PAGE_CONFIDENCE = 55.0
+
 
 def _ocr_with_layout(data: bytes, lang: str, timeout: int,
                      psm: int) -> tuple[str, str] | None:
@@ -304,15 +315,45 @@ def _split_into_false_columns(tsv: str) -> bool:
     return bad and not good
 
 
+def _page_confidence(tsv: str) -> tuple[float, int]:
+    """(mean word confidence, word count) from tesseract TSV; (-1, 0) when
+    the page produced no words."""
+    confidences: list[float] = []
+    for row in tsv.splitlines()[1:]:
+        cols = row.split("\t")
+        if len(cols) >= 12 and cols[0] == "5" and cols[11].strip():
+            try:
+                confidences.append(float(cols[10]))
+            except ValueError:
+                pass
+    if not confidences:
+        return -1.0, 0
+    return sum(confidences) / len(confidences), len(confidences)
+
+
+def _recover_low_confidence(data: bytes, lang: str, timeout: int):
+    """Extra reads of a page the first pass read poorly, each as
+    (text, mean confidence). PSM 1 adds tesseract's orientation detection,
+    which turns an upside-down page upright. Later changes add more
+    strategies (deskew, an external OCR hook)."""
+    attempts = []
+    osd = _ocr_with_layout(data, lang, timeout, OSD_PAGE_PSM)
+    if osd is not None:
+        attempts.append((osd[0], _page_confidence(osd[1])[0]))
+    return attempts
+
+
 def ocr_page_bytes(data: bytes, lang: str | None = None,
                    timeout: int = DEFAULT_TIMEOUT, psm: int | None = None) -> str | None:
-    """OCR one rendered page so that two-column pages and tables both come
-    out in reading order.
+    """OCR one rendered page so that two-column pages, tables and
+    misoriented pages all come out readable.
 
-    *psm* None (the default) reads with PSM 3 and reads again with PSM 6
-    when PSM 3 split the page into side-by-side blocks that are not real
-    columns (a second tesseract run, only on such pages). An explicit
-    *psm* is used as is.
+    *psm* None (the default) reads with PSM 3, reads again with PSM 6 when
+    PSM 3 split the page into side-by-side blocks that are not real
+    columns, and -- when the read is low-confidence and the page has ink --
+    retries to recover a misoriented page, keeping the best read. Each
+    extra tesseract run happens only on a page that needs it. An explicit
+    *psm* is used as is, with no recovery.
     """
     if psm is not None:
         return ocr_image_bytes(data, lang=lang, timeout=timeout, psm=psm)
@@ -327,6 +368,14 @@ def ocr_page_bytes(data: bytes, lang: str | None = None,
         rows = ocr_image_bytes(data, lang=resolved, timeout=timeout, psm=TABLE_PSM)
         if rows:
             return rows
+    confidence, _words = _page_confidence(tsv)
+    if confidence < MIN_PAGE_CONFIDENCE and not is_blank_image(data):
+        best_text, best_confidence = text, confidence
+        for cand_text, cand_confidence in _recover_low_confidence(
+                data, resolved, timeout):
+            if cand_confidence > best_confidence:
+                best_text, best_confidence = cand_text, cand_confidence
+        text = best_text
     return text.strip() or None
 
 
@@ -594,7 +643,7 @@ def clear_cache(cache_dir: str | None = None) -> tuple[int, int]:
 # Bump when the text produced for the same page render changes, so a cache
 # filled by an older version is not served. 2: pages read with PSM 3 (two
 # columns in order), PSM 6 for tables.
-PAGE_TEXT_VERSION = "2"
+PAGE_TEXT_VERSION = "3"
 
 
 def _cache_key(png: bytes, lang: str, psm: int | None) -> str:
@@ -635,11 +684,27 @@ def _cache_put(cache_dir: str | None, png: bytes, lang: str, psm: int | None, te
         pass  # A cache failure must never break OCR.
 
 
+# ocrmypdf straightens the scan before OCR: --rotate-pages turns pages
+# that were fed in sideways or upside down, --deskew levels a tilted scan.
+# Both use the bundled Leptonica, so they add no external tool. --clean
+# (despeckle) is left out because it needs unpaper, which is not a
+# dependency; a user who has unpaper can set ATOM_OCRMYPDF_ARGS.
+OCRMYPDF_ARGS = ("--rotate-pages", "--deskew", "--force-ocr", "--optimize", "0")
+OCRMYPDF_ARGS_ENV = "ATOM_OCRMYPDF_ARGS"
+
+
+def _ocrmypdf_args() -> list[str]:
+    extra = os.environ.get(OCRMYPDF_ARGS_ENV, "").strip()
+    return shlex.split(extra) if extra else list(OCRMYPDF_ARGS)
+
+
 def ocr_pdf_with_ocrmypdf(pdf_path: str, timeout: int = DEFAULT_OCR_TIMEOUT) -> str | None:
     """OCR a whole PDF via ocrmypdf into a temp searchable PDF, then read it.
 
-    Returns extracted text, or None when ocrmypdf is missing or fails. The
-    temp file is removed by the caller-side TemporaryDirectory.
+    Pages are straightened first (see OCRMYPDF_ARGS); ``ATOM_OCRMYPDF_ARGS``
+    replaces the option list. Returns extracted text, or None when ocrmypdf
+    is missing or fails. The temp file is removed by the caller-side
+    TemporaryDirectory.
     """
     if not shutil.which("ocrmypdf"):
         return None
@@ -651,7 +716,7 @@ def ocr_pdf_with_ocrmypdf(pdf_path: str, timeout: int = DEFAULT_OCR_TIMEOUT) -> 
         out_path = os.path.join(tmp, "ocr.pdf")
         try:
             subprocess.run(
-                ["ocrmypdf", "--force-ocr", "--optimize", "0",
+                ["ocrmypdf", *_ocrmypdf_args(),
                  os.path.abspath(pdf_path), out_path],
                 capture_output=True, timeout=timeout, check=True,
             )

@@ -48,6 +48,24 @@ run). Pages read twice cost the most: the full-page table took 2.5 times
 as long, the table of contents 2.2 times. The pages are synthetic: real
 scans will score worse on every row.
 
+A page that still reads with low word confidence after that -- and has
+ink, so it is not a blank page -- is read once more with tesseract's
+orientation detection (PSM 1), and the higher-confidence read is kept, so
+an upside-down scan comes out upright. This recovery pass runs only on a
+page that needs it: in the benchmark no normal page triggers it. Measured
+(CER, PSM 6 was the only reader before):
+
+| Page | Before | Now |
+| --- | ---: | ---: |
+| one column, upside down | 84% | 0% |
+| two columns, upside down | 83% | 0% |
+
+A page turned 90 degrees was already read correctly. Whole scanned PDFs
+sent through `ocrmypdf` are straightened by it instead: ATOM passes
+`--rotate-pages --deskew` (Leptonica, no extra tool). Set
+`ATOM_OCRMYPDF_ARGS` to change that list, e.g. to add `--clean` once
+`unpaper` is installed.
+
 ## Figures and diagrams
 
 With `--ocr-figures on` (default when OCR is not off), embedded images

@@ -238,6 +238,8 @@ PAGES = {
     "list-page":            dict(_lines="list"),
     "toc-page":             dict(_lines="toc"),
     "repeated-start":       dict(_lines="repeat"),
+    "one-column-upside-down": dict(columns=1, lines_per_col=40, _rotate=180),
+    "two-column-upside-down": dict(columns=2, _rotate=180),
     "one-column-skew-2":    dict(columns=1, lines_per_col=40, _skew=2.0),
     "two-column-skew-1":    dict(columns=2, _skew=1.0),
     "one-column-noisy":     dict(columns=1, lines_per_col=40, _blur=1.2, _noise=0.004),
@@ -250,6 +252,7 @@ def build(name, seed=7):
     skew = spec.pop("_skew", 0.0)
     blur = spec.pop("_blur", 0.0)
     noise = spec.pop("_noise", 0.0)
+    rotate = spec.pop("_rotate", 0)
     lines = spec.pop("_lines", None)
     if spec.pop("_table", False):
         img, truth = _table_page()
@@ -258,6 +261,8 @@ def build(name, seed=7):
     else:
         img, truth = _page(seed=seed, **spec)
     img = _degrade(img, skew=skew, blur=blur, noise=noise, seed=seed)
+    if rotate:
+        img = img.rotate(rotate, expand=True, fillcolor=255)
     buf = io.BytesIO()
     img.save(buf, "PNG")
     return buf.getvalue(), truth
