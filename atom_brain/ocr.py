@@ -61,6 +61,14 @@ import zlib
 from concurrent.futures import ThreadPoolExecutor
 
 VISION_ENV_VAR = "BOOK_TO_SKILL_VISION_CMD"
+# A command that reads a page image and prints its text, for pages
+# tesseract still fails after straightening and reorienting -- a
+# handwritten or otherwise hard page. ATOM only calls it (no model is
+# bundled) and only on such a page; the command and any model behind it
+# are the user's. It receives the page image's path as its one argument
+# and prints the recognized text. See docs/ocr-figures.md.
+OCR_HOOK_ENV_VAR = "BOOK_TO_SKILL_OCR_CMD"
+OCR_HOOK_TIMEOUT = 300
 FIGURE_PLACEHOLDER = (
     "h\u00ecnh n\u00e0y ch\u01b0a \u0111\u1ecdc \u0111\u01b0\u1ee3c n\u1ed9i dung, "
     "c\u1ea7n m\u00f4 t\u1ea3 b\u1eb1ng vision"
@@ -402,6 +410,49 @@ def _recover_low_confidence(data: bytes, lang: str, timeout: int):
     return attempts
 
 
+def external_ocr(image_bytes: bytes, timeout: int = OCR_HOOK_TIMEOUT) -> str | None:
+    """Run the user-configured OCR command on one page image, if set.
+
+    The command comes only from BOOK_TO_SKILL_OCR_CMD, is split without a
+    shell, and receives the page image's path as its single argument; its
+    stdout is the page text. Returns None when the variable is unset or the
+    command fails. ATOM bundles no model: this is the seam to plug one in
+    (for example a Vietnamese handwriting model), and it is called only on a
+    page the built-in OCR could not read."""
+    cmd = os.environ.get(OCR_HOOK_ENV_VAR, "").strip()
+    if not cmd or not image_bytes:
+        return None
+    try:
+        argv = shlex.split(cmd)
+    except ValueError as exc:
+        _warn(f"bad {OCR_HOOK_ENV_VAR}: {exc}")
+        return None
+    if not argv:
+        return None
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp.write(image_bytes)
+        tmp_path = tmp.name
+    try:
+        result = subprocess.run(
+            [*argv, tmp_path], capture_output=True, text=True,
+            timeout=timeout, encoding="utf-8", errors="replace",
+        )
+    except Exception as exc:
+        _warn(f"OCR hook failed: {type(exc).__name__}: {exc}")
+        return None
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip().splitlines()[-1:] or [""]
+        _warn(f"OCR hook exited {result.returncode}; page left to the "
+              f"built-in read. {detail[0][:200]}")
+        return None
+    return result.stdout.strip() or None
+
+
 def _deskew_candidate(data: bytes, lang: str, timeout: int):
     """A read of the page straightened, as (text, confidence), when it is
     tilted past DESKEW_TRIGGER; else None. Separate from the confidence
@@ -458,6 +509,14 @@ def ocr_page_bytes(data: bytes, lang: str | None = None,
     for cand_text, cand_confidence in candidates:
         if cand_confidence > best_confidence:
             best_text, best_confidence = cand_text, cand_confidence
+    # A page the built-in OCR still reads poorly (e.g. handwriting) goes to
+    # the external OCR hook when one is configured; its text wins because it
+    # is a model chosen for exactly these pages. No hook -> built-in read.
+    if best_confidence < MIN_PAGE_CONFIDENCE and os.environ.get(
+            OCR_HOOK_ENV_VAR, "").strip():
+        hook_text = external_ocr(data)
+        if hook_text:
+            return hook_text
     return best_text.strip() or None
 
 

@@ -136,6 +136,30 @@ stays marked unverified.
 - A figure block still sits at the end of its source's text, tagged with
   its page number.
 
+## A hard page: external OCR hook
+
+Some pages defeat tesseract no matter how they are straightened -- most of
+all handwriting. Point ATOM at your own OCR command and it routes exactly
+those pages to it:
+
+```bash
+export BOOK_TO_SKILL_OCR_CMD="my-ocr"   # receives a page image path, prints its text
+python3 scripts/extract.py scanned.pdf
+```
+
+ATOM bundles no model. The command is yours: a Vietnamese handwriting
+model (for example a TrOCR/VietOCR checkpoint, or HTR-ConvText), a cloud
+OCR, anything that reads an image path and prints text. It is called only
+on a page whose built-in read stays below the confidence threshold after
+the orientation and tilt recovery above, so a normal book never invokes
+it; when it returns text, that text is used for the page. Measure your
+model before trusting it -- handwriting OCR is far less accurate than
+print, and the result is not verified against the page.
+
+Clear the OCR cache (`atom --clear-ocr-cache`) after setting or changing
+the hook: a page's text is cached by its image, not by the hook, so a page
+read before the hook was set keeps its old text otherwise.
+
 ## Cache
 
 Page renders, OCR text and vision descriptions are cached under
