@@ -66,6 +66,25 @@ sent through `ocrmypdf` are straightened by it instead: ATOM passes
 `ATOM_OCRMYPDF_ARGS` to change that list, e.g. to add `--clean` once
 `unpaper` is installed.
 
+A page that is tilted is straightened before OCR. A tilt throws off
+tesseract's line finding, and a mild tilt is often read confidently yet
+wrong, so this does not wait for low confidence: every page with ink has
+its tilt estimated (a cheap projection-profile search on a small copy,
+about 5% of one OCR pass), and a page tilted past 5 degrees is rotated
+level and read again, keeping the higher-confidence read. It needs
+Pillow; without it the estimate returns zero and nothing changes.
+Measured (CER, the synthetic page tilted both ways):
+
+| Page tilt | Before | Now |
+| --- | ---: | ---: |
+| 4 degrees | 0% | 0% |
+| 7 degrees | 32% | 0% |
+| 10 degrees | 91% | 0% |
+
+In the benchmark only the tilted page pays the extra read; a straight
+page pays just the estimate. Real scans tilt further and less evenly than
+these, so treat the numbers as the direction, not a promise.
+
 ## Figures and diagrams
 
 With `--ocr-figures on` (default when OCR is not off), embedded images

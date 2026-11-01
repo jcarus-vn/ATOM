@@ -117,7 +117,7 @@ def test_recovery_keeps_the_first_read_when_it_is_better(monkeypatch):
 
 
 def test_cache_key_version_changed():
-    assert ocr.PAGE_TEXT_VERSION == "3"
+    assert ocr.PAGE_TEXT_VERSION == "4"  # bumped again for deskew
 
 
 @needs_tesseract
